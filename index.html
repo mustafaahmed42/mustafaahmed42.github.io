@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Grid Interactive Map - Erbil</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f5;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 340px;
+            height: 100vh;
+            background: white;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+            overflow-y: auto;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 18px;
+            font-weight: bold;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .sidebar-content {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .search-section {
+            margin-bottom: 25px;
+        }
+
+        .search-section h3 {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: #333;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .search-box {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 13px;
+            transition: border-color 0.3s;
+        }
+
+        .search-box input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .search-box button {
+            padding: 10px 14px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+
+        .search-box button:hover {
+            background: #5568d3;
+        }
+
+        .search-results {
+            background: #f9f9f9;
+            border-radius: 6px;
+            max-height: 150px;
+            overflow-y: auto;
+            padding: 10px;
+            display: none;
+            border: 1px solid #eee;
+        }
+
+        .search-results.active {
+            display: block;
+        }
+
+        .result-item {
+            padding: 8px;
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.3s;
+        }
+
+        .result-item:hover {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .radius-control {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .radius-control input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .radius-control span {
+            font-size: 11px;
+            color: #666;
+            min-width: 50px;
+        }
+
+        .layer-group {
+            margin-bottom: 20px;
+            border: 1px solid #eee;
+            border-radius: 6px;
+            padding: 12px;
+            background: #fafafa;
+        }
+
+        .layer-group-title {
+            font-weight: 600;
+            font-size: 12px;
+            margin-bottom: 10px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .layer-group-title:hover {
+            color: #667eea;
+        }
+
+        .toggle-arrow {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            transition: transform 0.3s;
+        }
+
+        .layer-group.collapsed .toggle-arrow {
+            transform: rotate(-90deg);
+        }
+
+        .layer-items {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding-left: 10px;
+        }
+
+        .layer-group.collapsed .layer-items {
+            display: none;
+        }
+
+        .layer-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+
+        .layer-item input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .layer-item label {
+            cursor: pointer;
+            flex: 1;
+            user-select: none;
+        }
+
+        .info-panel {
+            position: fixed;
+            bottom: 20px;
+            left: 360px;
+            width: 300px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            padding: 15px;
+            display: none;
+            z-index: 900;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .info-panel.active {
+            display: block;
+        }
+
+        .info-panel h4 {
+            margin-bottom: 10px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .info-panel p {
+            font-size: 12px;
+            margin-bottom: 8px;
+            color: #666;
+            word-break: break-word;
+        }
+
+        .info-panel .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #999;
+        }
+
+        .layer-search {
+            margin-bottom: 10px;
+        }
+
+        .layer-search input {
+            width: 100%;
+            padding: 6px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                max-height: 40vh;
+                bottom: 0;
+                top: auto;
+                box-shadow: 0 -2px 8px rgba(0,0,0,0.15);
+            }
+
+            #map {
+                height: 60vh;
+            }
+
+            .info-panel {
+                left: 20px;
+                right: 20px;
+                bottom: auto;
+                top: 20px;
+                width: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <i class="fas fa-map"></i> Power Grid Map
+        </div>
+        <div class="sidebar-content">
+            <!-- Transformer ID Search -->
+            <div class="search-section">
+                <h3>🔍 Search Transformer</h3>
+                <div class="search-box">
+                    <input type="text" id="transformerSearch" placeholder="Enter Transformer ID">
+                    <button onclick="searchTransformer()">Search</button>
+                </div>
+                <div id="transformerResults" class="search-results"></div>
+            </div>
+
+            <!-- Coordinate Search with Radius -->
+            <div class="search-section">
+                <h3>📍 Search by Coordinates</h3>
+                <div class="search-box">
+                    <input type="text" id="coordLat" placeholder="Latitude" style="flex: 0.5;">
+                    <input type="text" id="coordLng" placeholder="Longitude" style="flex: 0.5;">
+                    <button onclick="searchByCoordinate()" style="flex: 0.3;">Search</button>
+                </div>
+                <div class="radius-control">
+                    <label style="font-size: 12px;">Radius:</label>
+                    <input type="number" id="searchRadius" value="1000" min="100" max="50000" step="100">
+                    <span>meters</span>
+                </div>
+                <div id="coordinateResults" class="search-results"></div>
+            </div>
+
+            <!-- Layer Control -->
+            <div class="search-section">
+                <h3>📁 Layers</h3>
+                <div id="layerControl"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="map"></div>
+    <div id="infoPanel" class="info-panel">
+        <button class="close-btn" onclick="closeInfoPanel()">×</button>
+        <div id="infoPanelContent"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([36.2, 44.0], 11);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        let allFeatures = {
+            zones: [],
+            feeders: [],
+            transformers1: [],
+            transformers2: []
+        };
+
+        let activeFeatures = {
+            zones: new Set(),
+            feeders: new Set(),
+            transformers1: new Set(),
+            transformers2: new Set()
+        };
+
+        let layerMarkers = {
+            zones: new Map(),
+            feeders: new Map(),
+            transformers1: new Map(),
+            transformers2: new Map()
+        };
+
+        let transformerMarkers = [];
+        let circleMarker = null;
+
+        // Load all data
+        loadAllData();
+
+        function loadAllData() {
+            // Load Zones
+            fetch('data/erbil_zones.geojson')
+                .then(r => r.json())
+                .then(data => {
+                    data.features.forEach(f => {
+                        allFeatures.zones.push(f);
+                        const zoneId = f.properties.zone_name || f.id;
+                        layerMarkers.zones.set(zoneId, null);
+                    });
+                    buildLayerControl();
+                })
+                .catch(err => console.log('Zones not found:', err));
+
+            // Load Feeders
+            fetch('data/erbil_feeders.geojson')
+                .then(r => r.json())
+                .then(data => {
+                    data.features.forEach(f => {
+                        allFeatures.feeders.push(f);
+                        const feederId = f.properties.feeder_name || f.id;
+                        layerMarkers.feeders.set(feederId, null);
+                    });
+                    buildLayerControl();
+                })
+                .catch(err => console.log('Feeders not found:', err));
+
+            // Load Transformers 1
+            fetch('data/1092025_directory_1_transformer_NEW.geojson')
+                .then(r => r.json())
+                .then(data => {
+                    data.features.forEach(f => {
+                        allFeatures.transformers1.push(f);
+                        const id = f.properties['Transformer ID'] || f.id;
+                        transformerMarkers.push({
+                            feature: f,
+                            type: 'transformers1',
+                            id: id
+                        });
+                    });
+                })
+                .catch(err => console.log('Transformers 1 not found:', err));
+
+            // Load Transformers 2
+            fetch('data/1092025_directory_2_transformer_NEW.geojson')
+                .then(r => r.json())
+                .then(data => {
+                    data.features.forEach(f => {
+                        allFeatures.transformers2.push(f);
+                        const id = f.properties['Transformer ID'] || f.id;
+                        transformerMarkers.push({
+                            feature: f,
+                            type: 'transformers2',
+                            id: id
+                        });
+                    });
+                })
+                .catch(err => console.log('Transformers 2 not found:', err));
+        }
+
+        function buildLayerControl() {
+            const control = document.getElementById('layerControl');
+            control.innerHTML = '';
+
+            // Zones Group
+            const zonesGroup = document.createElement('div');
+            zonesGroup.className = 'layer-group';
+            zonesGroup.innerHTML = `
+                <div class="layer-group-title" onclick="toggleGroup(this)">
+                    <span class="toggle-arrow">▶</span>
+                    Erbil Zones (${allFeatures.zones.length})
+                </div>
+                <div class="layer-search">
+                    <input type="text" placeholder="Search zones..." onkeyup="filterLayerList('zones', this.value)">
+                </div>
+                <div class="layer-items" id="zones-list"></div>
+            `;
+            control.appendChild(zonesGroup);
+
+            // Feeders Group
+            const feedersGroup = document.createElement('div');
+            feedersGroup.className = 'layer-group';
+            feedersGroup.innerHTML = `
+                <div class="layer-group-title" onclick="toggleGroup(this)">
+                    <span class="toggle-arrow">▶</span>
+                    Erbil Feeders (${allFeatures.feeders.length})
+                </div>
+                <div class="layer-search">
+                    <input type="text" placeholder="Search feeders..." onkeyup="filterLayerList('feeders', this.value)">
+                </div>
+                <div class="layer-items" id="feeders-list"></div>
+            `;
+            control.appendChild(feedersGroup);
+
+            // Transformers Groups
+            const transformersGroup = document.createElement('div');
+            transformersGroup.className = 'layer-group';
+            transformersGroup.innerHTML = `
+                <div class="layer-group-title" onclick="toggleGroup(this)">
+                    <span class="toggle-arrow">▶</span>
+                    Transformers (${allFeatures.transformers1.length + allFeatures.transformers2.length})
+                </div>
+                <div class="layer-items" id="transformers-list"></div>
+            `;
+            control.appendChild(transformersGroup);
+
+            // Populate zones
+            const zonesList = document.getElementById('zones-list');
+            allFeatures.zones.forEach((f, idx) => {
+                const zoneId = f.properties.zone_name || `Zone_${idx}`;
+                const item = document.createElement('div');
+                item.className = 'layer-item';
+                item.dataset.zone = zoneId;
+                item.innerHTML = `
+                    <input type="checkbox" id="zone-${idx}" onchange="toggleZone('${zoneId}', this.checked)">
+                    <label for="zone-${idx}">${zoneId}</label>
+                `;
+                zonesList.appendChild(item);
+            });
+
+            // Populate feeders
+            const feedersList = document.getElementById('feeders-list');
+            allFeatures.feeders.forEach((f, idx) => {
+                const feederId = f.properties.feeder_name || `Feeder_${idx}`;
+                const item = document.createElement('div');
+                item.className = 'layer-item';
+                item.dataset.feeder = feederId;
+                item.innerHTML = `
+                    <input type="checkbox" id="feeder-${idx}" onchange="toggleFeeder('${feederId}', this.checked)">
+                    <label for="feeder-${idx}">${feederId}</label>
+                `;
+                feedersList.appendChild(item);
+            });
+
+            // Populate transformers
+            const transformersList = document.getElementById('transformers-list');
+            const t1Check = document.createElement('div');
+            t1Check.className = 'layer-item';
+            t1Check.innerHTML = `
+                <input type="checkbox" id="t1-checkbox" onchange="toggleTransformers1(this.checked)">
+                <label for="t1-checkbox">Directory 1</label>
+            `;
+            transformersList.appendChild(t1Check);
+
+            const t2Check = document.createElement('div');
+            t2Check.className = 'layer-item';
+            t2Check.innerHTML = `
+                <input type="checkbox" id="t2-checkbox" onchange="toggleTransformers2(this.checked)">
+                <label for="t2-checkbox">Directory 2</label>
+            `;
+            transformersList.appendChild(t2Check);
+        }
+
+        function toggleGroup(element) {
+            element.parentElement.classList.toggle('collapsed');
+        }
+
+        function filterLayerList(type, searchTerm) {
+            const list = document.getElementById(`${type}-list`);
+            const items = list.querySelectorAll('.layer-item');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm.toLowerCase()) ? 'flex' : 'none';
+            });
+        }
+
+        function toggleZone(zoneId, visible) {
+            if (visible) {
+                activeFeatures.zones.add(zoneId);
+                renderZones();
+            } else {
+                activeFeatures.zones.delete(zoneId);
+                if (layerMarkers.zones.get(zoneId)) {
+                    map.removeLayer(layerMarkers.zones.get(zoneId));
+                    layerMarkers.zones.set(zoneId, null);
+                }
+            }
+        }
+
+        function toggleFeeder(feederId, visible) {
+            if (visible) {
+                activeFeatures.feeders.add(feederId);
+                renderFeeders();
+            } else {
+                activeFeatures.feeders.delete(feederId);
+                if (layerMarkers.feeders.get(feederId)) {
+                    map.removeLayer(layerMarkers.feeders.get(feederId));
+                    layerMarkers.feeders.set(feederId, null);
+                }
+            }
+        }
+
+        function toggleTransformers1(visible) {
+            if (visible) {
+                renderTransformers1();
+            } else {
+                allFeatures.transformers1.forEach(f => {
+                    const id = f.properties['Transformer ID'] || f.id;
+                    if (layerMarkers.transformers1.get(id)) {
+                        map.removeLayer(layerMarkers.transformers1.get(id));
+                        layerMarkers.transformers1.delete(id);
+                    }
+                });
+            }
+        }
+
+        function toggleTransformers2(visible) {
+            if (visible) {
+                renderTransformers2();
+            } else {
+                allFeatures.transformers2.forEach(f => {
+                    const id = f.properties['Transformer ID'] || f.id;
+                    if (layerMarkers.transformers2.get(id)) {
+                        map.removeLayer(layerMarkers.transformers2.get(id));
+                        layerMarkers.transformers2.delete(id);
+                    }
+                });
+            }
+        }
+
+        function renderZones() {
+            allFeatures.zones.forEach(f => {
+                const zoneId = f.properties.zone_name || f.id;
+                if (activeFeatures.zones.has(zoneId) && !layerMarkers.zones.get(zoneId)) {
+                    const layer = L.geoJSON(f, {
+                        style: {
+                            color: '#00aa00',
+                            weight: 2,
+                            opacity: 0.5,
+                            fillOpacity: 0.2
+                        },
+                        onEachFeature: (feature, layer) => {
+                            layer.on('click', () => showFeatureInfo(feature, 'Zone'));
+                        }
+                    }).addTo(map);
+                    layerMarkers.zones.set(zoneId, layer);
+                }
+            });
+        }
+
+        function renderFeeders() {
+            allFeatures.feeders.forEach(f => {
+                const feederId = f.properties.feeder_name || f.id;
+                if (activeFeatures.feeders.has(feederId) && !layerMarkers.feeders.get(feederId)) {
+                    const layer = L.geoJSON(f, {
+                        style: {
+                            color: '#ff0000',
+                            weight: 2,
+                            opacity: 0.7
+                        },
+                        onEachFeature: (feature, layer) => {
+                            layer.on('click', () => showFeatureInfo(feature, 'Feeder'));
+                        }
+                    }).addTo(map);
+                    layerMarkers.feeders.set(feederId, layer);
+                }
+            });
+        }
+
+        function renderTransformers1() {
+            allFeatures.transformers1.forEach(f => {
+                const id = f.properties['Transformer ID'] || f.id;
+                if (!layerMarkers.transformers1.get(id)) {
+                    const latlng = f.geometry.coordinates;
+                    const marker = L.circleMarker([latlng[1], latlng[0]], {
+                        radius: 8,
+                        fillColor: '#ff7800',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                    marker.on('click', () => showFeatureInfo(f, 'Transformer'));
+                    marker.addTo(map);
+                    layerMarkers.transformers1.set(id, marker);
+                }
+            });
+        }
+
+        function renderTransformers2() {
+            allFeatures.transformers2.forEach(f => {
+                const id = f.properties['Transformer ID'] || f.id;
+                if (!layerMarkers.transformers2.get(id)) {
+                    const latlng = f.geometry.coordinates;
+                    const marker = L.circleMarker([latlng[1], latlng[0]], {
+                        radius: 8,
+                        fillColor: '#00a8ff',
+                        color: '#fff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                    marker.on('click', () => showFeatureInfo(f, 'Transformer'));
+                    marker.addTo(map);
+                    layerMarkers.transformers2.set(id, marker);
+                }
+            });
+        }
+
+        // Transformer ID Search
+        function searchTransformer() {
+            const searchTerm = document.getElementById('transformerSearch').value.trim().toUpperCase();
+            if (!searchTerm) return;
+
+            const results = transformerMarkers.filter(m => 
+                m.id && m.id.toString().toUpperCase().includes(searchTerm)
+            );
+
+            displayTransformerResults(results, searchTerm);
+        }
+
+        function displayTransformerResults(results, searchTerm) {
+            const resultsDiv = document.getElementById('transformerResults');
+            resultsDiv.innerHTML = '';
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<p style="color: #999; font-size: 12px;">No transformers found</p>';
+            } else {
+                results.forEach(result => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    item.textContent = `ID: ${result.id}`;
+                    item.onclick = () => {
+                        const coords = result.feature.geometry.coordinates;
+                        map.setView([coords[1], coords[0]], 16);
+                        showFeatureInfo(result.feature, 'Transformer');
+                    };
+                    resultsDiv.appendChild(item);
+                });
+            }
+            resultsDiv.classList.add('active');
+        }
+
+        // Coordinate Search with Radius (in Meters)
+        function searchByCoordinate() {
+            const lat = parseFloat(document.getElementById('coordLat').value);
+            const lng = parseFloat(document.getElementById('coordLng').value);
+            const radiusMeters = parseFloat(document.getElementById('searchRadius').value);
+
+            if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) {
+                alert('Please enter valid latitude, longitude, and radius');
+                return;
+            }
+
+            const radiusKm = radiusMeters / 1000; // Convert to km for distance calc
+
+            // Draw circle on map
+            if (circleMarker) map.removeLayer(circleMarker);
+            circleMarker = L.circle([lat, lng], {
+                radius: radiusMeters,
+                color: '#667eea',
+                fill: true,
+                fillColor: '#667eea',
+                fillOpacity: 0.1,
+                weight: 2
+            }).addTo(map);
+
+            // Find transformers within radius
+            const resultsInRadius = transformerMarkers
+                .map(m => ({
+                    ...m,
+                    distance: calculateDistance(lat, lng, m.feature.geometry.coordinates[1], m.feature.geometry.coordinates[0])
+                }))
+                .filter(m => m.distance <= radiusKm)
+                .sort((a, b) => a.distance - b.distance);
+
+            displayCoordinateResults(resultsInRadius, searchTerm);
+            map.setView([lat, lng], 14);
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Earth's radius in km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function displayCoordinateResults(results) {
+            const resultsDiv = document.getElementById('coordinateResults');
+            resultsDiv.innerHTML = '';
+
+            if (results.length === 0) {
+                resultsDiv.innerHTML = '<p style="color: #999; font-size: 12px;">No transformers found within radius</p>';
+            } else {
+                results.forEach(result => {
+                    const item = document.createElement('div');
+                    item.className = 'result-item';
+                    const distanceMeters = (result.distance * 1000).toFixed(0);
+                    item.textContent = `${result.id} (${distanceMeters} m away)`;
+                    item.onclick = () => {
+                        const coords = result.feature.geometry.coordinates;
+                        map.setView([coords[1], coords[0]], 16);
+                        showFeatureInfo(result.feature, 'Transformer');
+                    };
+                    resultsDiv.appendChild(item);
+                });
+            }
+            resultsDiv.classList.add('active');
+        }
+
+        function showFeatureInfo(feature, type) {
+            const infoPanel = document.getElementById('infoPanel');
+            const content = document.getElementById('infoPanelContent');
+            
+            let html = `<h4>${type} Info</h4>`;
+            for (let key in feature.properties) {
+                if (feature.properties[key]) {
+                    html += `<p><strong>${key}:</strong> ${feature.properties[key]}</p>`;
+                }
+            }
+            
+            content.innerHTML = html;
+            infoPanel.classList.add('active');
+        }
+
+        function closeInfoPanel() {
+            document.getElementById('infoPanel').classList.remove('active');
+        }
+    </script>
+</body>
+</html>
