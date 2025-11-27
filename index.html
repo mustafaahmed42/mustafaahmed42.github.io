@@ -221,7 +221,7 @@
             buildLayerControl();
         }).catch(err => console.log('Feeders error:', err));
 
-        fetch('data/1092025_directory_1_transformer_NEW.geojson').then(r => r.json()).then(data => {
+        fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
             console.log('Dir 1:', data.features.length);
             data.features.forEach(f => {
                 const id = f.properties['Transformer ID'];
@@ -233,7 +233,7 @@
             buildLayerControl();
         }).catch(err => console.log('Dir 1 error:', err));
 
-        fetch('data/1092025_directory_2_transformer_NEW.geojson').then(r => r.json()).then(data => {
+        fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
             console.log('Dir 2:', data.features.length);
             data.features.forEach(f => {
                 const id = f.properties['Transformer ID'];
