@@ -291,7 +291,113 @@
                             color: zoneColors[idx % zoneColors.length]
                         };
                     });
-                    buildLayerControl();
+                    // ===== LAYER CONTROL BUILD =====
+function buildLayerControl() {
+    const control = document.getElementById('layerControl');
+    control.innerHTML = ''; // CLEAR EVERYTHING FIRST
+
+    // Zones Group
+    const zonesGroup = document.createElement('div');
+    zonesGroup.className = 'layer-group';
+    zonesGroup.innerHTML = `
+        <div class="layer-group-title" onclick="toggleGroup(this)">
+            <span class="toggle-arrow">▶</span>
+            Erbil Zones (${Object.keys(zonesById).length})
+        </div>
+        <div class="layer-items" id="zones-list"></div>
+    `;
+    control.appendChild(zonesGroup);
+
+    // Populate Zones
+    const zonesList = document.getElementById('zones-list');
+    for (const zoneId in zonesById) {
+        const zoneObj = zonesById[zoneId];
+        const item = document.createElement('div');
+        item.className = 'layer-item';
+        item.innerHTML = `
+            <input type="checkbox" id="zone-${zoneId}" onchange="toggleZone('${zoneId}', this.checked)">
+            <div class="layer-color-swatch" style="background-color: ${zoneObj.color};"></div>
+            <label for="zone-${zoneId}">${zoneId}</label>
+        `;
+        zonesList.appendChild(item);
+    }
+
+    // Feeders Group (with zone hierarchy)
+    const feedersGroup = document.createElement('div');
+    feedersGroup.className = 'layer-group';
+    feedersGroup.innerHTML = `
+        <div class="layer-group-title" onclick="toggleGroup(this)">
+            <span class="toggle-arrow">▶</span>
+            Erbil Feeders (${Object.keys(feedersById).length})
+        </div>
+        <div class="layer-items" id="feeders-list"></div>
+    `;
+    control.appendChild(feedersGroup);
+
+    // Populate Feeders grouped by Zone
+    const feedersList = document.getElementById('feeders-list');
+    const sortedZones = Object.keys(feedersByZone).sort();
+    
+    sortedZones.forEach(zone => {
+        const zoneGroup = document.createElement('div');
+        zoneGroup.className = 'sub-layer-group';
+        zoneGroup.innerHTML = `<div class="sub-layer-group-title">${zone} (${feedersByZone[zone].length})</div>`;
+        
+        const feedersInZone = document.createElement('div');
+        feedersInZone.style.display = 'flex';
+        feedersInZone.style.flexDirection = 'column';
+        feedersInZone.style.gap = '6px';
+        
+        feedersByZone[zone].forEach(feederName => {
+            const feederObj = feedersById[feederName];
+            const item = document.createElement('div');
+            item.className = 'layer-item';
+            item.innerHTML = `
+                <input type="checkbox" id="feeder-${feederName}" onchange="toggleFeeder('${feederName}', this.checked)">
+                <div class="layer-color-swatch" style="background-color: ${feederObj.color};"></div>
+                <label for="feeder-${feederName}">${feederName}</label>
+            `;
+            feedersInZone.appendChild(item);
+        });
+        
+        zoneGroup.appendChild(feedersInZone);
+        feedersList.appendChild(zoneGroup);
+    });
+
+    // Transformers Group
+    const transformersGroup = document.createElement('div');
+    transformersGroup.className = 'layer-group';
+    transformersGroup.innerHTML = `
+        <div class="layer-group-title" onclick="toggleGroup(this)">
+            <span class="toggle-arrow">▶</span>
+            Transformers (${transformersDir1.length + transformersDir2.length})
+        </div>
+        <div class="layer-items" id="transformers-list"></div>
+    `;
+    control.appendChild(transformersGroup);
+
+    const transformersList = document.getElementById('transformers-list');
+    const t1Item = document.createElement('div');
+    t1Item.className = 'layer-item';
+    t1Item.innerHTML = `
+        <input type="checkbox" id="t1-checkbox" checked disabled>
+        <div class="layer-color-swatch" style="background-color: #ff7800;"></div>
+        <label for="t1-checkbox">Directory 1 (${transformersDir1.length})</label>
+    `;
+    transformersList.appendChild(t1Item);
+
+    const t2Item = document.createElement('div');
+    t2Item.className = 'layer-item';
+    t2Item.innerHTML = `
+        <input type="checkbox" id="t2-checkbox" checked disabled>
+        <div class="layer-color-swatch" style="background-color: #00a8ff;"></div>
+        <label for="t2-checkbox">Directory 2 (${transformersDir2.length})</label>
+    `;
+    transformersList.appendChild(t2Item);
+
+    console.log('Layer control built successfully');
+}
+;
                 })
                 .catch(err => console.log('Zones error:', err));
 
