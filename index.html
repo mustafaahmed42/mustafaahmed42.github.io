@@ -345,24 +345,38 @@
             fetch('data/1092025_directory_1_transformer_NEW.geojson')
                 .then(r => r.json())
                 .then(data => {
-                    data.features.forEach(f => {
-                        const id = f.properties['Transformer ID'];
-                        const coords = f.geometry.coordinates;
-                        transformersDir1.push({
-                            id: id,
-                            feature: f,
-                            latlng: coords,
-                            dir: 1
-                        });
-                        allTransformers.push({
-                            id: id,
-                            feature: f,
-                            latlng: coords,
-                            dir: 1
-                        });
+                    console.log('===== DIRECTORY 1 =====');
+                    console.log('Dir 1 data loaded, total features:', data.features.length);
+                    
+                    data.features.forEach((f, idx) => {
+                        try {
+                            const id = f.properties['Transformer ID'];
+                            const coords = f.geometry.coordinates;
+                            
+                            if (idx < 3) {
+                                console.log(`Feature ${idx}: ID=${id}, Coords=${JSON.stringify(coords)}, GeometryType=${f.geometry.type}`);
+                            }
+                            
+                            transformersDir1.push({
+                                id: id,
+                                feature: f,
+                                latlng: coords,
+                                dir: 1
+                            });
+                            allTransformers.push({
+                                id: id,
+                                feature: f,
+                                latlng: coords,
+                                dir: 1
+                            });
+                        } catch (e) {
+                            console.log(`Error parsing feature ${idx}:`, e);
+                        }
                     });
-                    console.log('Transformers Dir 1 loaded:', transformersDir1.length);
+                    
+                    console.log('Transformers Dir 1 successfully loaded:', transformersDir1.length);
                     renderTransformersDir1();
+                    buildLayerControl();
                 })
                 .catch(err => console.log('Transformers Dir 1 error:', err));
 
@@ -370,24 +384,38 @@
             fetch('data/1092025_directory_2_transformer_NEW.geojson')
                 .then(r => r.json())
                 .then(data => {
-                    data.features.forEach(f => {
-                        const id = f.properties['Transformer ID'];
-                        const coords = f.geometry.coordinates;
-                        transformersDir2.push({
-                            id: id,
-                            feature: f,
-                            latlng: coords,
-                            dir: 2
-                        });
-                        allTransformers.push({
-                            id: id,
-                            feature: f,
-                            latlng: coords,
-                            dir: 2
-                        });
+                    console.log('===== DIRECTORY 2 =====');
+                    console.log('Dir 2 data loaded, total features:', data.features.length);
+                    
+                    data.features.forEach((f, idx) => {
+                        try {
+                            const id = f.properties['Transformer ID'];
+                            const coords = f.geometry.coordinates;
+                            
+                            if (idx < 3) {
+                                console.log(`Feature ${idx}: ID=${id}, Coords=${JSON.stringify(coords)}, GeometryType=${f.geometry.type}`);
+                            }
+                            
+                            transformersDir2.push({
+                                id: id,
+                                feature: f,
+                                latlng: coords,
+                                dir: 2
+                            });
+                            allTransformers.push({
+                                id: id,
+                                feature: f,
+                                latlng: coords,
+                                dir: 2
+                            });
+                        } catch (e) {
+                            console.log(`Error parsing feature ${idx}:`, e);
+                        }
                     });
-                    console.log('Transformers Dir 2 loaded:', transformersDir2.length);
+                    
+                    console.log('Transformers Dir 2 successfully loaded:', transformersDir2.length);
                     renderTransformersDir2();
+                    buildLayerControl();
                 })
                 .catch(err => console.log('Transformers Dir 2 error:', err));
         }
@@ -395,108 +423,110 @@
         // ===== LAYER CONTROL BUILD =====
         function buildLayerControl() {
             const control = document.getElementById('layerControl');
-            control.innerHTML = '';
+            if (!control.innerHTML.includes('Erbil Zones')) {
+                control.innerHTML = '';
 
-            // Zones Group
-            const zonesGroup = document.createElement('div');
-            zonesGroup.className = 'layer-group';
-            zonesGroup.innerHTML = `
-                <div class="layer-group-title" onclick="toggleGroup(this)">
-                    <span class="toggle-arrow">▶</span>
-                    Erbil Zones (${Object.keys(zonesById).length})
-                </div>
-                <div class="layer-items" id="zones-list"></div>
-            `;
-            control.appendChild(zonesGroup);
-
-            // Populate Zones
-            const zonesList = document.getElementById('zones-list');
-            for (const zoneId in zonesById) {
-                const zoneObj = zonesById[zoneId];
-                const item = document.createElement('div');
-                item.className = 'layer-item';
-                item.innerHTML = `
-                    <input type="checkbox" id="zone-${zoneId}" onchange="toggleZone('${zoneId}', this.checked)">
-                    <div class="layer-color-swatch" style="background-color: ${zoneObj.color};"></div>
-                    <label for="zone-${zoneId}">${zoneId}</label>
+                // Zones Group
+                const zonesGroup = document.createElement('div');
+                zonesGroup.className = 'layer-group';
+                zonesGroup.innerHTML = `
+                    <div class="layer-group-title" onclick="toggleGroup(this)">
+                        <span class="toggle-arrow">▶</span>
+                        Erbil Zones (${Object.keys(zonesById).length})
+                    </div>
+                    <div class="layer-items" id="zones-list"></div>
                 `;
-                zonesList.appendChild(item);
-            }
+                control.appendChild(zonesGroup);
 
-            // Feeders Group (with zone hierarchy)
-            const feedersGroup = document.createElement('div');
-            feedersGroup.className = 'layer-group';
-            feedersGroup.innerHTML = `
-                <div class="layer-group-title" onclick="toggleGroup(this)">
-                    <span class="toggle-arrow">▶</span>
-                    Erbil Feeders (${Object.keys(feedersById).length})
-                </div>
-                <div class="layer-items" id="feeders-list"></div>
-            `;
-            control.appendChild(feedersGroup);
-
-            // Populate Feeders grouped by Zone
-            const feedersList = document.getElementById('feeders-list');
-            const sortedZones = Object.keys(feedersByZone).sort();
-            
-            sortedZones.forEach(zone => {
-                const zoneGroup = document.createElement('div');
-                zoneGroup.className = 'sub-layer-group';
-                zoneGroup.innerHTML = `<div class="sub-layer-group-title">${zone} (${feedersByZone[zone].length})</div>`;
-                
-                const feedersInZone = document.createElement('div');
-                feedersInZone.style.display = 'flex';
-                feedersInZone.style.flexDirection = 'column';
-                feedersInZone.style.gap = '6px';
-                
-                feedersByZone[zone].forEach(feederName => {
-                    const feederObj = feedersById[feederName];
+                // Populate Zones
+                const zonesList = document.getElementById('zones-list');
+                for (const zoneId in zonesById) {
+                    const zoneObj = zonesById[zoneId];
                     const item = document.createElement('div');
                     item.className = 'layer-item';
                     item.innerHTML = `
-                        <input type="checkbox" id="feeder-${feederName}" onchange="toggleFeeder('${feederName}', this.checked)">
-                        <div class="layer-color-swatch" style="background-color: ${feederObj.color};"></div>
-                        <label for="feeder-${feederName}">${feederName}</label>
+                        <input type="checkbox" id="zone-${zoneId}" onchange="toggleZone('${zoneId}', this.checked)">
+                        <div class="layer-color-swatch" style="background-color: ${zoneObj.color};"></div>
+                        <label for="zone-${zoneId}">${zoneId}</label>
                     `;
-                    feedersInZone.appendChild(item);
-                });
+                    zonesList.appendChild(item);
+                }
+
+                // Feeders Group (with zone hierarchy)
+                const feedersGroup = document.createElement('div');
+                feedersGroup.className = 'layer-group';
+                feedersGroup.innerHTML = `
+                    <div class="layer-group-title" onclick="toggleGroup(this)">
+                        <span class="toggle-arrow">▶</span>
+                        Erbil Feeders (${Object.keys(feedersById).length})
+                    </div>
+                    <div class="layer-items" id="feeders-list"></div>
+                `;
+                control.appendChild(feedersGroup);
+
+                // Populate Feeders grouped by Zone
+                const feedersList = document.getElementById('feeders-list');
+                const sortedZones = Object.keys(feedersByZone).sort();
                 
-                zoneGroup.appendChild(feedersInZone);
-                feedersList.appendChild(zoneGroup);
-            });
+                sortedZones.forEach(zone => {
+                    const zoneGroup = document.createElement('div');
+                    zoneGroup.className = 'sub-layer-group';
+                    zoneGroup.innerHTML = `<div class="sub-layer-group-title">${zone} (${feedersByZone[zone].length})</div>`;
+                    
+                    const feedersInZone = document.createElement('div');
+                    feedersInZone.style.display = 'flex';
+                    feedersInZone.style.flexDirection = 'column';
+                    feedersInZone.style.gap = '6px';
+                    
+                    feedersByZone[zone].forEach(feederName => {
+                        const feederObj = feedersById[feederName];
+                        const item = document.createElement('div');
+                        item.className = 'layer-item';
+                        item.innerHTML = `
+                            <input type="checkbox" id="feeder-${feederName}" onchange="toggleFeeder('${feederName}', this.checked)">
+                            <div class="layer-color-swatch" style="background-color: ${feederObj.color};"></div>
+                            <label for="feeder-${feederName}">${feederName}</label>
+                        `;
+                        feedersInZone.appendChild(item);
+                    });
+                    
+                    zoneGroup.appendChild(feedersInZone);
+                    feedersList.appendChild(zoneGroup);
+                });
 
-            // Transformers Group
-            const transformersGroup = document.createElement('div');
-            transformersGroup.className = 'layer-group';
-            transformersGroup.innerHTML = `
-                <div class="layer-group-title" onclick="toggleGroup(this)">
-                    <span class="toggle-arrow">▶</span>
-                    Transformers (${transformersDir1.length + transformersDir2.length})
-                </div>
-                <div class="layer-items" id="transformers-list"></div>
-            `;
-            control.appendChild(transformersGroup);
+                // Transformers Group
+                const transformersGroup = document.createElement('div');
+                transformersGroup.className = 'layer-group';
+                transformersGroup.innerHTML = `
+                    <div class="layer-group-title" onclick="toggleGroup(this)">
+                        <span class="toggle-arrow">▶</span>
+                        Transformers (${transformersDir1.length + transformersDir2.length})
+                    </div>
+                    <div class="layer-items" id="transformers-list"></div>
+                `;
+                control.appendChild(transformersGroup);
 
-            const transformersList = document.getElementById('transformers-list');
-            const t1Item = document.createElement('div');
-            t1Item.className = 'layer-item';
-            t1Item.innerHTML = `
-                <input type="checkbox" id="t1-checkbox" checked disabled>
-                <div class="layer-color-swatch" style="background-color: #ff7800;"></div>
-                <label for="t1-checkbox">Directory 1 (${transformersDir1.length})</label>
-            `;
-            transformersList.appendChild(t1Item);
+                const transformersList = document.getElementById('transformers-list');
+                const t1Item = document.createElement('div');
+                t1Item.className = 'layer-item';
+                t1Item.innerHTML = `
+                    <input type="checkbox" id="t1-checkbox" checked disabled>
+                    <div class="layer-color-swatch" style="background-color: #ff7800;"></div>
+                    <label for="t1-checkbox">Directory 1 (${transformersDir1.length})</label>
+                `;
+                transformersList.appendChild(t1Item);
 
-            const t2Item = document.createElement('div');
-            t2Item.className = 'layer-item';
-            t2Item.innerHTML = `
-                <input type="checkbox" id="t2-checkbox" checked disabled>
-                <div class="layer-color-swatch" style="background-color: #00a8ff;"></div>
-                <label for="t2-checkbox">Directory 2 (${transformersDir2.length})</label>
-            `;
-            transformersList.appendChild(t2Item);
+                const t2Item = document.createElement('div');
+                t2Item.className = 'layer-item';
+                t2Item.innerHTML = `
+                    <input type="checkbox" id="t2-checkbox" checked disabled>
+                    <div class="layer-color-swatch" style="background-color: #00a8ff;"></div>
+                    <label for="t2-checkbox">Directory 2 (${transformersDir2.length})</label>
+                `;
+                transformersList.appendChild(t2Item);
 
-            console.log('Layer control built successfully');
+                console.log('Layer control built successfully');
+            }
         }
 
         function toggleGroup(element) {
@@ -574,10 +604,18 @@
 
         function renderTransformersDir1() {
             if (transformersDir1Layer) map.removeLayer(transformersDir1Layer);
+            if (transformersDir1.length === 0) {
+                console.log('No transformers in Dir 1 to render');
+                return;
+            }
+            
             const fc = {
                 type: 'FeatureCollection',
                 features: transformersDir1.map(t => t.feature)
             };
+            
+            console.log('Rendering Dir 1 with', fc.features.length, 'features');
+            
             transformersDir1Layer = L.geoJSON(fc, {
                 pointToLayer: (feature, latlng) => {
                     const marker = L.circleMarker(latlng, {
@@ -603,10 +641,18 @@
 
         function renderTransformersDir2() {
             if (transformersDir2Layer) map.removeLayer(transformersDir2Layer);
+            if (transformersDir2.length === 0) {
+                console.log('No transformers in Dir 2 to render');
+                return;
+            }
+            
             const fc = {
                 type: 'FeatureCollection',
                 features: transformersDir2.map(t => t.feature)
             };
+            
+            console.log('Rendering Dir 2 with', fc.features.length, 'features');
+            
             transformersDir2Layer = L.geoJSON(fc, {
                 pointToLayer: (feature, latlng) => {
                     const marker = L.circleMarker(latlng, {
@@ -664,6 +710,9 @@
             const lng = parseFloat(document.getElementById('coordLng').value);
             const radiusMeters = parseFloat(document.getElementById('searchRadius').value);
 
+            console.log('Search: Lat=' + lat + ', Lng=' + lng + ', Radius=' + radiusMeters + 'm');
+            console.log('allTransformers.length:', allTransformers.length);
+
             if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) {
                 alert('Please enter valid latitude, longitude, and radius');
                 return;
@@ -689,6 +738,7 @@
                 .filter(t => t.distance <= radiusKm)
                 .sort((a, b) => a.distance - b.distance);
 
+            console.log('Results found:', resultsInRadius.length);
             displayCoordinateResultsTable(resultsInRadius);
             map.setView([lat, lng], 14);
         }
