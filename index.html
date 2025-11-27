@@ -447,84 +447,64 @@ function buildLayerControl() {
                 })
                 .catch(err => console.log('Feeders error:', err));
 
-            // Load Transformers Directory 1
+                                  // Load Transformers Directory 1
             fetch('data/1092025_directory_1_transformer_NEW.geojson')
-                .then(r => r.json())
+                .then(r => {
+                    console.log('✓ Dir 1 FETCH succeeded, status:', r.status);
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
                 .then(data => {
-                    console.log('===== DIRECTORY 1 =====');
-                    console.log('Dir 1 data loaded, total features:', data.features.length);
+                    console.log('✓ Dir 1 JSON parsed successfully');
+                    console.log('  Features count:', data.features ? data.features.length : 'NO FEATURES');
                     
-                    data.features.forEach((f, idx) => {
-                        try {
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach((f, idx) => {
+                            if (idx < 1) { // Just log first one
+                                console.log('  First feature ID:', f.properties['Transformer ID']);
+                                console.log('  Coordinates:', f.geometry.coordinates);
+                            }
                             const id = f.properties['Transformer ID'];
                             const coords = f.geometry.coordinates;
-                            
-                            if (idx < 3) {
-                                console.log(`Feature ${idx}: ID=${id}, Coords=${JSON.stringify(coords)}, GeometryType=${f.geometry.type}`);
-                            }
-                            
-                            transformersDir1.push({
-                                id: id,
-                                feature: f,
-                                latlng: coords,
-                                dir: 1
-                            });
-                            allTransformers.push({
-                                id: id,
-                                feature: f,
-                                latlng: coords,
-                                dir: 1
-                            });
-                        } catch (e) {
-                            console.log(`Error parsing feature ${idx}:`, e);
-                        }
-                    });
-                    
-                    console.log('Transformers Dir 1 successfully loaded:', transformersDir1.length);
+                            transformersDir1.push({ id, feature: f, latlng: coords, dir: 1 });
+                            allTransformers.push({ id, feature: f, latlng: coords, dir: 1 });
+                        });
+                    }
+                    console.log('✓ Dir 1 LOADED:', transformersDir1.length, 'transformers');
                     renderTransformersDir1();
                     buildLayerControl();
                 })
-                .catch(err => console.log('Transformers Dir 1 error:', err));
+                .catch(err => console.error('❌ Dir 1 ERROR:', err.message));
 
-            // Load Transformers Directory 2
+            // Load Transformers Directory 2  
             fetch('data/1092025_directory_2_transformer_NEW.geojson')
-                .then(r => r.json())
+                .then(r => {
+                    console.log('✓ Dir 2 FETCH succeeded, status:', r.status);
+                    if (!r.ok) throw new Error('HTTP ' + r.status);
+                    return r.json();
+                })
                 .then(data => {
-                    console.log('===== DIRECTORY 2 =====');
-                    console.log('Dir 2 data loaded, total features:', data.features.length);
+                    console.log('✓ Dir 2 JSON parsed successfully');
+                    console.log('  Features count:', data.features ? data.features.length : 'NO FEATURES');
                     
-                    data.features.forEach((f, idx) => {
-                        try {
+                    if (data.features && data.features.length > 0) {
+                        data.features.forEach((f, idx) => {
+                            if (idx < 1) { // Just log first one
+                                console.log('  First feature ID:', f.properties['Transformer ID']);
+                                console.log('  Coordinates:', f.geometry.coordinates);
+                            }
                             const id = f.properties['Transformer ID'];
                             const coords = f.geometry.coordinates;
-                            
-                            if (idx < 3) {
-                                console.log(`Feature ${idx}: ID=${id}, Coords=${JSON.stringify(coords)}, GeometryType=${f.geometry.type}`);
-                            }
-                            
-                            transformersDir2.push({
-                                id: id,
-                                feature: f,
-                                latlng: coords,
-                                dir: 2
-                            });
-                            allTransformers.push({
-                                id: id,
-                                feature: f,
-                                latlng: coords,
-                                dir: 2
-                            });
-                        } catch (e) {
-                            console.log(`Error parsing feature ${idx}:`, e);
-                        }
-                    });
-                    
-                    console.log('Transformers Dir 2 successfully loaded:', transformersDir2.length);
+                            transformersDir2.push({ id, feature: f, latlng: coords, dir: 2 });
+                            allTransformers.push({ id, feature: f, latlng: coords, dir: 2 });
+                        });
+                    }
+                    console.log('✓ Dir 2 LOADED:', transformersDir2.length, 'transformers');
                     renderTransformersDir2();
                     buildLayerControl();
                 })
-                .catch(err => console.log('Transformers Dir 2 error:', err));
-        }
+                .catch(err => console.error('❌ Dir 2 ERROR:', err.message));
+
 
         // ===== LAYER CONTROL BUILD =====
         function buildLayerControl() {
