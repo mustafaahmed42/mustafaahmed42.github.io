@@ -13,7 +13,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
         #map { height: 100vh; width: 100%; margin-left: var(--sidebar-width); transition: margin-left 0.3s; }
-        :root { --sidebar-width: 340px; }
+        :root { --sidebar-width: 420px; }
         .sidebar { position: fixed; left: 0; top: 0; width: var(--sidebar-width); height: 100vh; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.15); overflow-y: auto; z-index: 1000; display: flex; flex-direction: column; }
         .sidebar-resize-handle { position: absolute; right: 0; top: 0; width: 6px; height: 100%; background: transparent; cursor: col-resize; z-index: 1001; }
         .sidebar-resize-handle:hover { background: #667eea; }
@@ -66,10 +66,12 @@
         .results-table tbody tr:hover { background: #f9f9f9; cursor: pointer; }
         .distance-badge { background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
         .transformer-label { font-size: 10px !important; color: #222 !important; text-shadow: 1px 1px 2px #fff !important; font-weight: 600 !important; }
+        .search-results-info { background: #e8f0fe; border: 1px solid #d2e3fc; border-radius: 6px; padding: 12px; margin-bottom: 15px; font-size: 12px; color: #1f2937; }
+        .search-results-info strong { color: #667eea; }
         @media (max-width: 768px) {
             :root { --sidebar-width: 100%; }
-            .sidebar { width: 100%; height: auto; max-height: 40vh; bottom: 0; top: auto; }
-            #map { height: 60vh; margin-left: 0; }
+            .sidebar { width: 100%; height: auto; max-height: 50vh; bottom: 0; top: auto; }
+            #map { height: 50vh; margin-left: 0; }
             .info-panel { left: 20px; right: 20px; }
             .modal-content { width: 95%; margin: 20% auto; }
         }
@@ -88,7 +90,7 @@
                 </div>
             </div>
             <div class="search-section">
-                <h3>Search by Coordinates</h3>
+                <h3>Find Closest Transformers</h3>
                 <div class="search-box">
                     <input type="text" id="coordLat" placeholder="Latitude" style="flex: 0.5;">
                     <input type="text" id="coordLng" placeholder="Longitude" style="flex: 0.5;">
@@ -96,9 +98,10 @@
                 </div>
                 <div class="radius-control">
                     <label style="font-size: 12px;">Radius:</label>
-                    <input type="number" id="searchRadius" value="1000" min="100" max="50000" step="100">
+                    <input type="number" id="searchRadius" value="100" min="50" max="50000" step="50">
                     <span>meters</span>
                 </div>
+                <div id="searchResultsInfo"></div>
             </div>
             <div class="search-section">
                 <h3>Layers</h3>
@@ -150,7 +153,7 @@
         resizeHandle.addEventListener('mousedown', () => { isResizing = true; });
         document.addEventListener('mousemove', (e) => {
             if (!isResizing) return;
-            const newWidth = Math.max(250, Math.min(600, e.clientX));
+            const newWidth = Math.max(300, Math.min(600, e.clientX));
             document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
         });
         document.addEventListener('mouseup', () => { isResizing = false; });
@@ -167,11 +170,11 @@
             }
         }
 
-        let activeZones = new Set(), activeFeeders = new Set(), transformersDir1Visible = true, transformersDir2Visible = true;
-        let layerCache = {zones: new Map(), feeders: new Map()}, circleMarker = null, transformersDir1Layer = null, transformersDir2Layer = null;
+        let activeZones = new Set(), activeFeeders = new Set();
+        let layerCache = {zones: new Map(), feeders: new Map()}, circleMarker = null;
+        let searchResultsLayer = null;
 
         fetch('data/erbil_zones.geojson').then(r => r.json()).then(data => {
-            console.log('Zones:', data.features.length);
             data.features.forEach((f, idx) => {
                 zonesById[f.properties.Zone_name] = {feature: f, color: zoneColors[idx % zoneColors.length]};
             });
@@ -179,7 +182,6 @@
         }).catch(err => console.log('Zones error:', err));
 
         fetch('data/erbil_feeders.geojson').then(r => r.json()).then(data => {
-            console.log('Feeders:', data.features.length);
             const feedersMap = {};
             data.features.forEach(f => {
                 const feederName = f.properties.FeederName;
@@ -197,32 +199,25 @@
                 if (!feedersByZone[zone]) feedersByZone[zone] = [];
                 feedersByZone[zone].push(feederName);
             }
-            console.log('Feeders distinct:', Object.keys(feedersById).length);
             buildLayerControl();
         }).catch(err => console.log('Feeders error:', err));
 
         fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            console.log('Dir 1:', data.features.length);
             data.features.forEach(f => {
                 const id = f.properties['Transformer ID'];
                 const coords = f.geometry.coordinates;
                 transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
                 allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
             });
-            renderTransformersDir1();
-            buildLayerControl();
         }).catch(err => console.log('Dir 1 error:', err));
 
         fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            console.log('Dir 2:', data.features.length);
             data.features.forEach(f => {
                 const id = f.properties['Transformer ID'];
                 const coords = f.geometry.coordinates;
                 transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
                 allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
             });
-            renderTransformersDir2();
-            buildLayerControl();
         }).catch(err => console.log('Dir 2 error:', err));
 
         function buildLayerControl() {
@@ -264,19 +259,6 @@
                 zoneGroup.appendChild(feedersInZone);
                 feedersList.appendChild(zoneGroup);
             });
-            const transformersGroup = document.createElement('div');
-            transformersGroup.className = 'layer-group';
-            transformersGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Transformers (' + (transformersDir1.length + transformersDir2.length) + ')</div><div class="layer-items" id="transformers-list"></div>';
-            control.appendChild(transformersGroup);
-            const transformersList = document.getElementById('transformers-list');
-            const t1Item = document.createElement('div');
-            t1Item.className = 'layer-item';
-            t1Item.innerHTML = '<input type="checkbox" id="t1-checkbox" checked onchange="toggleTransformersDir1(this.checked)"><div class="layer-color-swatch" style="background-color: #ff7800;"></div><label for="t1-checkbox">Directory 1 (' + transformersDir1.length + ')</label>';
-            transformersList.appendChild(t1Item);
-            const t2Item = document.createElement('div');
-            t2Item.className = 'layer-item';
-            t2Item.innerHTML = '<input type="checkbox" id="t2-checkbox" checked onchange="toggleTransformersDir2(this.checked)"><div class="layer-color-swatch" style="background-color: #00a8ff;"></div><label for="t2-checkbox">Directory 2 (' + transformersDir2.length + ')</label>';
-            transformersList.appendChild(t2Item);
         }
 
         function toggleGroup(element) { element.parentElement.classList.toggle('collapsed'); }
@@ -284,17 +266,142 @@
         function renderZone(zoneId) { if (layerCache.zones.has(zoneId)) return; const zoneObj = zonesById[zoneId]; const layer = L.geoJSON(zoneObj.feature, {style: {color: zoneObj.color, weight: 2, opacity: 1, fillOpacity: 0.5}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Zone')); }}).addTo(map); layerCache.zones.set(zoneId, layer); }
         function toggleFeeder(feederName, visible) { if (visible) { activeFeeders.add(feederName); renderFeeder(feederName); } else { activeFeeders.delete(feederName); if (layerCache.feeders.get(feederName)) { map.removeLayer(layerCache.feeders.get(feederName)); layerCache.feeders.delete(feederName); } } }
         function renderFeeder(feederName) { if (layerCache.feeders.has(feederName)) return; const feederObj = feedersById[feederName]; const featureCollection = {type: 'FeatureCollection', features: feederObj.features}; const layer = L.geoJSON(featureCollection, {style: {color: feederObj.color, weight: 2.5, opacity: 0.8}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Feeder')); }}).addTo(map); layerCache.feeders.set(feederName, layer); }
-        function renderTransformersDir1() { if (transformersDir1Layer) map.removeLayer(transformersDir1Layer); if (transformersDir1.length === 0 || !transformersDir1Visible) return; const fc = {type: 'FeatureCollection', features: transformersDir1.map(t => t.feature)}; transformersDir1Layer = L.geoJSON(fc, {pointToLayer: (feature, latlng) => { const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#ff7800', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8}); const id = feature.properties['Transformer ID']; marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'}); marker.on('click', () => showFeatureInfo(feature, 'Transformer')); return marker; }}).addTo(map); }
-        function renderTransformersDir2() { if (transformersDir2Layer) map.removeLayer(transformersDir2Layer); if (transformersDir2.length === 0 || !transformersDir2Visible) return; const fc = {type: 'FeatureCollection', features: transformersDir2.map(t => t.feature)}; transformersDir2Layer = L.geoJSON(fc, {pointToLayer: (feature, latlng) => { const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#00a8ff', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8}); const id = feature.properties['Transformer ID']; marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'}); marker.on('click', () => showFeatureInfo(feature, 'Transformer')); return marker; }}).addTo(map); }
-        function toggleTransformersDir1(visible) { transformersDir1Visible = visible; renderTransformersDir1(); }
-        function toggleTransformersDir2(visible) { transformersDir2Visible = visible; renderTransformersDir2(); }
 
-        function searchByCoordinate() { const lat = parseFloat(document.getElementById('coordLat').value); const lng = parseFloat(document.getElementById('coordLng').value); const radiusMeters = parseFloat(document.getElementById('searchRadius').value); if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) { alert('Please enter valid latitude, longitude, and radius'); return; } const radiusKm = radiusMeters / 1000; if (circleMarker) map.removeLayer(circleMarker); circleMarker = L.circle([lat, lng], {radius: radiusMeters, color: '#667eea', fill: true, fillColor: '#667eea', fillOpacity: 0.1, weight: 2}).addTo(map); const resultsInRadius = allTransformers.map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])})).filter(t => t.distance <= radiusKm).sort((a, b) => a.distance - b.distance); displayCoordinateResultsTable(resultsInRadius); map.setView([lat, lng], 14); }
-        function calculateDistance(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
-        function displayCoordinateResultsTable(results) { const tableBody = document.getElementById('resultsTableBody'); tableBody.innerHTML = ''; if (results.length === 0) { tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">No transformers found within radius</td></tr>'; } else { results.forEach((result, rank) => { const row = document.createElement('tr'); const distanceMeters = (result.distance * 1000).toFixed(0); row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td><span class="distance-badge">' + distanceMeters + ' m</span></td>'; row.style.cursor = 'pointer'; row.onclick = () => { map.setView([result.latlng[1], result.latlng[0]], 16); showFeatureInfo(result.feature, 'Transformer'); closeResultsModal(); }; tableBody.appendChild(row); }); } document.getElementById('resultsModal').classList.add('active'); }
-        function closeResultsModal() { document.getElementById('resultsModal').classList.remove('active'); }
-        function showFeatureInfo(feature, type) { const infoPanel = document.getElementById('infoPanel'); const content = document.getElementById('infoPanelContent'); let html = '<h4>' + type + ' Info</h4>'; for (let key in feature.properties) { if (feature.properties[key] && feature.properties[key] !== null && feature.properties[key] !== 'NULL') { html += '<p><strong>' + key + ':</strong> ' + feature.properties[key] + '</p>'; } } content.innerHTML = html; infoPanel.classList.add('active'); }
-        function closeInfoPanel() { document.getElementById('infoPanel').classList.remove('active'); }
+        function clearSearchResults() {
+            if (searchResultsLayer) {
+                map.removeLayer(searchResultsLayer);
+                searchResultsLayer = null;
+            }
+            if (circleMarker) {
+                map.removeLayer(circleMarker);
+                circleMarker = null;
+            }
+        }
+
+        function showSearchResultsOnMap(results) {
+            clearSearchResults();
+            if (results.length === 0) return;
+            
+            searchResultsLayer = L.layerGroup();
+            results.forEach(result => {
+                const lat = result.latlng[1];
+                const lng = result.latlng[0];
+                const id = result.id;
+                const color = result.dir === 1 ? '#ff7800' : '#00a8ff';
+                
+                const marker = L.circleMarker([lat, lng], {
+                    radius: 8,
+                    fillColor: color,
+                    color: '#fff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                });
+                
+                marker.bindTooltip(id, {
+                    permanent: true,
+                    direction: 'top',
+                    offset: [0, -12],
+                    className: 'transformer-label'
+                });
+                
+                marker.on('click', () => showFeatureInfo(result.feature, 'Transformer'));
+                searchResultsLayer.addLayer(marker);
+            });
+            
+            searchResultsLayer.addTo(map);
+        }
+
+        function searchByCoordinate() {
+            const lat = parseFloat(document.getElementById('coordLat').value);
+            const lng = parseFloat(document.getElementById('coordLng').value);
+            const radiusMeters = parseFloat(document.getElementById('searchRadius').value);
+            if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) {
+                alert('Please enter valid latitude, longitude, and radius');
+                return;
+            }
+            const radiusKm = radiusMeters / 1000;
+            if (circleMarker) map.removeLayer(circleMarker);
+            circleMarker = L.circle([lat, lng], {
+                radius: radiusMeters,
+                color: '#667eea',
+                fill: true,
+                fillColor: '#667eea',
+                fillOpacity: 0.1,
+                weight: 2
+            }).addTo(map);
+            
+            const resultsInRadius = allTransformers
+                .map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])}))
+                .filter(t => t.distance <= radiusKm)
+                .sort((a, b) => a.distance - b.distance);
+            
+            displayCoordinateResultsTable(resultsInRadius);
+            showSearchResultsOnMap(resultsInRadius);
+            displaySearchInfo(resultsInRadius, radiusMeters);
+            map.setView([lat, lng], 14);
+        }
+
+        function displaySearchInfo(results, radius) {
+            const infoDiv = document.getElementById('searchResultsInfo');
+            if (results.length === 0) {
+                infoDiv.innerHTML = '<div class="search-results-info">No transformers found within <strong>' + radius + ' meters</strong></div>';
+            } else {
+                infoDiv.innerHTML = '<div class="search-results-info">Found <strong>' + results.length + '</strong> transformer(s) within <strong>' + radius + ' meters</strong>. Showing on map.</div>';
+            }
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return R * c;
+        }
+
+        function displayCoordinateResultsTable(results) {
+            const tableBody = document.getElementById('resultsTableBody');
+            tableBody.innerHTML = '';
+            if (results.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">No transformers found within radius</td></tr>';
+            } else {
+                results.forEach((result, rank) => {
+                    const row = document.createElement('tr');
+                    const distanceMeters = (result.distance * 1000).toFixed(0);
+                    row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td><span class="distance-badge">' + distanceMeters + ' m</span></td>';
+                    row.style.cursor = 'pointer';
+                    row.onclick = () => {
+                        map.setView([result.latlng[1], result.latlng[0]], 16);
+                        showFeatureInfo(result.feature, 'Transformer');
+                        closeResultsModal();
+                    };
+                    tableBody.appendChild(row);
+                });
+            }
+            document.getElementById('resultsModal').classList.add('active');
+        }
+
+        function closeResultsModal() {
+            document.getElementById('resultsModal').classList.remove('active');
+        }
+
+        function showFeatureInfo(feature, type) {
+            const infoPanel = document.getElementById('infoPanel');
+            const content = document.getElementById('infoPanelContent');
+            let html = '<h4>' + type + ' Info</h4>';
+            for (let key in feature.properties) {
+                if (feature.properties[key] && feature.properties[key] !== null && feature.properties[key] !== 'NULL') {
+                    html += '<p><strong>' + key + ':</strong> ' + feature.properties[key] + '</p>';
+                }
+            }
+            content.innerHTML = html;
+            infoPanel.classList.add('active');
+        }
+
+        function closeInfoPanel() {
+            document.getElementById('infoPanel').classList.remove('active');
+        }
     </script>
 </body>
 </html>
