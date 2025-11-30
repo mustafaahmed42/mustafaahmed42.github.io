@@ -13,7 +13,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
         #map { height: 100vh; width: 100%; margin-left: var(--sidebar-width); transition: margin-left 0.3s; }
-        :root { --sidebar-width: 420px; }
+        :root { --sidebar-width: 500px; }
         .sidebar { position: fixed; left: 0; top: 0; width: var(--sidebar-width); height: 100vh; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.15); overflow-y: auto; z-index: 1000; display: flex; flex-direction: column; }
         .sidebar-resize-handle { position: absolute; right: 0; top: 0; width: 6px; height: 100%; background: transparent; cursor: col-resize; z-index: 1001; }
         .sidebar-resize-handle:hover { background: #667eea; }
@@ -68,6 +68,11 @@
         .transformer-label { font-size: 10px !important; color: #222 !important; text-shadow: 1px 1px 2px #fff !important; font-weight: 600 !important; }
         .search-results-info { background: #e8f0fe; border: 1px solid #d2e3fc; border-radius: 6px; padding: 12px; margin-bottom: 15px; font-size: 12px; color: #1f2937; }
         .search-results-info strong { color: #667eea; }
+        .marker-legend { background: #f9f9f9; border: 1px solid #eee; border-radius: 6px; padding: 12px; margin-bottom: 15px; font-size: 11px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .legend-item:last-child { margin-bottom: 0; }
+        .legend-color { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #999; }
+        .legend-label { color: #555; font-size: 11px; }
         @media (max-width: 768px) {
             :root { --sidebar-width: 100%; }
             .sidebar { width: 100%; height: auto; max-height: 50vh; bottom: 0; top: auto; }
@@ -102,6 +107,20 @@
                     <span>meters</span>
                 </div>
                 <div id="searchResultsInfo"></div>
+                <div class="marker-legend">
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #e74c3c; box-shadow: 0 0 0 1px #c0392b;"></div>
+                        <div class="legend-label">Your Search Location</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #ff7800;"></div>
+                        <div class="legend-label">Dir 1 Transformers</div>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background-color: #00a8ff;"></div>
+                        <div class="legend-label">Dir 2 Transformers</div>
+                    </div>
+                </div>
             </div>
             <div class="search-section">
                 <h3>Layers</h3>
@@ -171,7 +190,7 @@
         }
 
         let activeZones = new Set(), activeFeeders = new Set();
-        let layerCache = {zones: new Map(), feeders: new Map()}, circleMarker = null;
+        let layerCache = {zones: new Map(), feeders: new Map()}, circleMarker = null, searchLocationMarker = null;
         let searchResultsLayer = null;
 
         fetch('data/erbil_zones.geojson').then(r => r.json()).then(data => {
@@ -276,10 +295,16 @@
                 map.removeLayer(circleMarker);
                 circleMarker = null;
             }
+            if (searchLocationMarker) {
+                map.removeLayer(searchLocationMarker);
+                searchLocationMarker = null;
+            }
         }
 
         function showSearchResultsOnMap(results) {
-            clearSearchResults();
+            if (searchResultsLayer) {
+                map.removeLayer(searchResultsLayer);
+            }
             if (results.length === 0) return;
             
             searchResultsLayer = L.layerGroup();
@@ -321,7 +346,9 @@
                 return;
             }
             const radiusKm = radiusMeters / 1000;
-            if (circleMarker) map.removeLayer(circleMarker);
+            
+            clearSearchResults();
+            
             circleMarker = L.circle([lat, lng], {
                 radius: radiusMeters,
                 color: '#667eea',
@@ -330,6 +357,22 @@
                 fillOpacity: 0.1,
                 weight: 2
             }).addTo(map);
+            
+            searchLocationMarker = L.circleMarker([lat, lng], {
+                radius: 8,
+                fillColor: '#e74c3c',
+                color: '#c0392b',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.9
+            }).addTo(map);
+            
+            searchLocationMarker.bindTooltip('Search Location', {
+                permanent: true,
+                direction: 'top',
+                offset: [0, -12],
+                className: 'transformer-label'
+            });
             
             const resultsInRadius = allTransformers
                 .map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])}))
