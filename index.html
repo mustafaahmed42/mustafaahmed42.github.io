@@ -200,58 +200,58 @@
             buildLayerControl();
         }).catch(err => console.log('Zones error:', err));
 
-        fetch('data/erbil_feeders.geojson').then(r => r.json()).then(data => {
-            const feedersMap = {};
-            data.features.forEach(f => {
-                const feederName = f.properties.FeederName;
-                const zone = f.properties.Zone;
-                if (!feedersMap[feederName]) feedersMap[feederName] = {zone: zone, features: []};
-                feedersMap[feederName].features.push(f);
-            });
-            for (const feederName in feedersMap) {
-                const zone = feedersMap[feederName].zone;
-                if (!feederColors[feederName]) {
-                    feederColors[feederName] = colorPalette[colorIndex % colorPalette.length];
-                    colorIndex++;
-                }
-                feedersById[feederName] = {zone: zone, features: feedersMap[feederName].features, color: feederColors[feederName]};
-                if (!feedersByZone[zone]) feedersByZone[zone] = [];
-                feedersByZone[zone].push(feederName);
-            }
-            buildLayerControl();
-        }).catch(err => console.log('Feeders error:', err));
+// REPLACE THIS SECTION in your HTML:
 
-        fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            try {
-                data.features.forEach(f => {
-                    if (f.geometry && f.geometry.coordinates) {
-                        const id = f.properties['Transformer ID'] || 'Unknown';
-                        const coords = f.geometry.coordinates;
-                        transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
-                        allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
-                    }
-                });
-                console.log('✅ Dir 1 Loaded:', transformersDir1.length, 'transformers');
-            } catch (e) {
-                console.error('❌ Dir 1 Error:', e.message);
+fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
+    try {
+        data.features.forEach(f => {
+            if (f.geometry && f.geometry.coordinates && f.properties) {
+                // Auto-detect ID property - try multiple names
+                let id = f.properties['Transformer ID'] 
+                    || f.properties['transformer_id'] 
+                    || f.properties['TRANSFORMER_ID']
+                    || f.properties['TransformerID']
+                    || f.properties['ID']
+                    || f.properties['id']
+                    || Object.keys(f.properties)[0]; // Use first property as fallback
+                    
+                id = String(id || 'Unknown');
+                const coords = f.geometry.coordinates;
+                transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
+                allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
             }
-        }).catch(err => console.log('Dir 1 error:', err));
+        });
+        console.log('✅ Dir 1 Loaded:', transformersDir1.length, 'transformers');
+    } catch (e) {
+        console.error('❌ Dir 1 Error:', e.message);
+    }
+}).catch(err => console.log('Dir 1 file error:', err));
 
-        fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            try {
-                data.features.forEach(f => {
-                    if (f.geometry && f.geometry.coordinates) {
-                        const id = f.properties['Transformer ID'] || 'Unknown';
-                        const coords = f.geometry.coordinates;
-                        transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
-                        allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
-                    }
-                });
-                console.log('✅ Dir 2 Loaded:', transformersDir2.length, 'transformers');
-            } catch (e) {
-                console.error('❌ Dir 2 Error:', e.message);
+fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
+    try {
+        data.features.forEach(f => {
+            if (f.geometry && f.geometry.coordinates && f.properties) {
+                // Auto-detect ID property
+                let id = f.properties['Transformer ID'] 
+                    || f.properties['transformer_id'] 
+                    || f.properties['TRANSFORMER_ID']
+                    || f.properties['TransformerID']
+                    || f.properties['ID']
+                    || f.properties['id']
+                    || Object.keys(f.properties)[0];
+                    
+                id = String(id || 'Unknown');
+                const coords = f.geometry.coordinates;
+                transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
+                allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
             }
-        }).catch(err => console.log('Dir 2 error:', err));
+        });
+        console.log('✅ Dir 2 Loaded:', transformersDir2.length, 'transformers');
+    } catch (e) {
+        console.error('❌ Dir 2 Error:', e.message);
+    }
+}).catch(err => console.log('Dir 2 file error:', err));
+
 
         function buildLayerControl() {
             const control = document.getElementById('layerControl');
