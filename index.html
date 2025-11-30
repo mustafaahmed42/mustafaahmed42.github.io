@@ -285,7 +285,8 @@
             const transformersList = document.getElementById('transformers-list');
             const t1Item = document.createElement('div');
             t1Item.className = 'layer-item';
-            t1Item.innerHTML = '<input type="checkbox" id="t1-checkbox" checked disabled><div class="layer-color-swatch" style="background-color: #ff7800;"></div><label for="t1-checkbox">Directory 1 (' + transformersDir1.length + ')</label>';
+            t1Item.innerHTML = '<input type="checkbox" id="t1-checkbox" checked onchange="toggleTransformersDir1(this.checked)">
+<div class="layer-color-swatch" style="background-color: #ff7800;"></div><label for="t1-checkbox">Directory 1 (' + transformersDir1.length + ')</label>';
             transformersList.appendChild(t1Item);
 
             const t2Item = document.createElement('div');
