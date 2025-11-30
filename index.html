@@ -12,13 +12,21 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
-        #map { height: 100vh; width: 100%; margin-left: var(--sidebar-width); transition: margin-left 0.3s; }
-        :root { --sidebar-width: 500px; }
+        #map { height: 100vh; width: 100%; margin-left: var(--sidebar-width); margin-right: var(--results-sidebar-width); transition: margin 0.3s; }
+        :root { --sidebar-width: 500px; --results-sidebar-width: 0px; }
         .sidebar { position: fixed; left: 0; top: 0; width: var(--sidebar-width); height: 100vh; background: white; box-shadow: 2px 0 8px rgba(0,0,0,0.15); overflow-y: auto; z-index: 1000; display: flex; flex-direction: column; }
         .sidebar-resize-handle { position: absolute; right: 0; top: 0; width: 6px; height: 100%; background: transparent; cursor: col-resize; z-index: 1001; }
         .sidebar-resize-handle:hover { background: #667eea; }
         .sidebar-header { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; font-size: 18px; font-weight: bold; position: sticky; top: 0; z-index: 10; }
         .sidebar-content { flex: 1; padding: 20px; overflow-y: auto; }
+        .results-sidebar { position: fixed; right: 0; top: 0; width: 0px; height: 100vh; background: white; box-shadow: -2px 0 8px rgba(0,0,0,0.15); overflow-y: auto; z-index: 999; display: flex; flex-direction: column; transition: width 0.3s; }
+        .results-sidebar.active { width: 450px; }
+        .results-header { padding: 15px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 10; }
+        .results-header h3 { margin: 0; font-size: 16px; }
+        .results-close-btn { background: none; border: none; color: white; font-size: 24px; cursor: pointer; }
+        .results-content { flex: 1; padding: 15px; overflow-y: auto; }
+        .export-btn { padding: 8px 12px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 10px; width: 100%; }
+        .export-btn:hover { background: #45a049; }
         .search-section { margin-bottom: 25px; }
         .search-section h3 { font-size: 13px; font-weight: 600; margin-bottom: 12px; color: #333; text-transform: uppercase; }
         .search-box { display: flex; gap: 8px; margin-bottom: 12px; }
@@ -37,6 +45,8 @@
         .layer-group { margin-bottom: 20px; border: 1px solid #eee; border-radius: 6px; padding: 12px; background: #fafafa; }
         .layer-group-title { font-weight: 600; font-size: 12px; margin-bottom: 10px; color: #333; display: flex; align-items: center; gap: 8px; cursor: pointer; user-select: none; }
         .layer-group-title:hover { color: #667eea; }
+        .zone-select-all { font-size: 11px; color: #667eea; cursor: pointer; margin-left: auto; padding: 2px 6px; border: 1px solid #667eea; border-radius: 3px; }
+        .zone-select-all:hover { background: #667eea; color: white; }
         .toggle-arrow { display: inline-block; width: 12px; height: 12px; transition: transform 0.3s; }
         .layer-group.collapsed .toggle-arrow { transform: rotate(-90deg); }
         .layer-items { display: flex; flex-direction: column; gap: 6px; max-height: 400px; overflow-y: auto; padding-left: 10px; }
@@ -46,25 +56,20 @@
         .layer-item label { cursor: pointer; flex: 1; user-select: none; }
         .layer-color-swatch { width: 16px; height: 16px; border-radius: 3px; border: 1px solid #ddd; }
         .sub-layer-group { padding-left: 15px; border-left: 2px solid #ddd; margin-top: 10px; }
-        .sub-layer-group-title { font-weight: 500; font-size: 11px; margin-bottom: 8px; color: #555; }
+        .sub-layer-group-title { font-weight: 500; font-size: 11px; margin-bottom: 8px; color: #555; display: flex; align-items: center; justify-content: space-between; }
+        .sub-zone-select-all { font-size: 10px; color: #667eea; cursor: pointer; border: 1px solid #667eea; padding: 1px 4px; border-radius: 2px; }
+        .sub-zone-select-all:hover { background: #667eea; color: white; }
         .info-panel { position: fixed; bottom: 20px; left: calc(var(--sidebar-width) + 20px); width: 300px; background: white; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.15); padding: 15px; display: none; z-index: 900; max-height: 250px; overflow-y: auto; }
         .info-panel.active { display: block; }
         .info-panel h4 { margin-bottom: 10px; font-size: 14px; color: #333; }
         .info-panel p { font-size: 12px; margin-bottom: 8px; color: #666; word-break: break-word; }
         .info-panel .close-btn { position: absolute; top: 10px; right: 10px; background: none; border: none; font-size: 18px; cursor: pointer; color: #999; }
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.4); }
-        .modal.active { display: block; }
-        .modal-content { background-color: white; margin: 5% auto; padding: 0; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); width: 90%; max-width: 700px; max-height: 80vh; overflow-y: auto; }
-        .modal-header { padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; display: flex; justify-content: space-between; align-items: center; }
-        .modal-header h2 { margin: 0; font-size: 18px; }
-        .modal-close { background: none; border: none; color: white; font-size: 28px; cursor: pointer; }
-        .modal-body { padding: 20px; }
-        .results-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-        .results-table thead { background: #f5f5f5; }
-        .results-table th { padding: 10px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
-        .results-table td { padding: 10px; border-bottom: 1px solid #eee; }
-        .results-table tbody tr:hover { background: #f9f9f9; cursor: pointer; }
-        .distance-badge { background: #667eea; color: white; padding: 4px 8px; border-radius: 4px; font-weight: 600; }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .results-table thead { background: #f5f5f5; position: sticky; top: 0; }
+        .results-table th { padding: 8px; text-align: left; font-weight: 600; border-bottom: 2px solid #ddd; }
+        .results-table td { padding: 8px; border-bottom: 1px solid #eee; }
+        .results-table tbody tr:hover { background: #f9f9f9; }
+        .distance-badge { background: #667eea; color: white; padding: 2px 6px; border-radius: 3px; font-weight: 600; font-size: 10px; }
         .transformer-label { font-size: 10px !important; color: #222 !important; text-shadow: 1px 1px 2px #fff !important; font-weight: 600 !important; }
         .search-results-info { background: #e8f0fe; border: 1px solid #d2e3fc; border-radius: 6px; padding: 12px; margin-bottom: 15px; font-size: 12px; color: #1f2937; }
         .search-results-info strong { color: #667eea; }
@@ -74,11 +79,11 @@
         .legend-color { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #fff; box-shadow: 0 0 0 1px #999; }
         .legend-label { color: #555; font-size: 11px; }
         @media (max-width: 768px) {
-            :root { --sidebar-width: 100%; }
+            :root { --sidebar-width: 100%; --results-sidebar-width: 0px; }
             .sidebar { width: 100%; height: auto; max-height: 50vh; bottom: 0; top: auto; }
-            #map { height: 50vh; margin-left: 0; }
+            #map { height: 50vh; margin-left: 0; margin-right: 0; }
+            .results-sidebar.active { width: 100%; height: 50vh; }
             .info-panel { left: 20px; right: 20px; }
-            .modal-content { width: 95%; margin: 20% auto; }
         }
     </style>
 </head>
@@ -106,7 +111,6 @@
                     <input type="number" id="searchRadius" value="100" min="50" max="50000" step="50">
                     <span>meters</span>
                 </div>
-                <div id="searchResultsInfo"></div>
                 <div class="marker-legend">
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #e74c3c; box-shadow: 0 0 0 1px #c0392b;"></div>
@@ -114,11 +118,11 @@
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #ff7800;"></div>
-                        <div class="legend-label">Dir 1 Transformers</div>
+                        <div class="legend-label">CO1 Transformers</div>
                     </div>
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: #00a8ff;"></div>
-                        <div class="legend-label">Dir 2 Transformers</div>
+                        <div class="legend-label">CO2 Transformers</div>
                     </div>
                 </div>
             </div>
@@ -130,30 +134,32 @@
     </div>
 
     <div id="map"></div>
+    
+    <div class="results-sidebar" id="resultsSidebar">
+        <div class="results-header">
+            <h3>Search Results</h3>
+            <button class="results-close-btn" onclick="closeResultsSidebar()">×</button>
+        </div>
+        <div class="results-content">
+            <button class="export-btn" onclick="exportToCSV()"><i class="fas fa-download"></i> Export CSV</button>
+            <table class="results-table">
+                <thead>
+                    <tr>
+                        <th>Rank</th>
+                        <th>Transformer</th>
+                        <th>Feeder</th>
+                        <th>Zone</th>
+                        <th>Distance</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
     <div id="infoPanel" class="info-panel">
         <button class="close-btn" onclick="closeInfoPanel()">×</button>
         <div id="infoPanelContent"></div>
-    </div>
-
-    <div id="resultsModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Closest Transformers</h2>
-                <button class="modal-close" onclick="closeResultsModal()">×</button>
-            </div>
-            <div class="modal-body">
-                <table class="results-table">
-                    <thead>
-                        <tr>
-                            <th>Rank</th>
-                            <th>Transformer ID</th>
-                            <th>Distance (meters)</th>
-                        </tr>
-                    </thead>
-                    <tbody id="resultsTableBody"></tbody>
-                </table>
-            </div>
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
@@ -162,6 +168,7 @@
         const colorPalette = ['#FF1744', '#F50057', '#D500F9', '#651FFF', '#2979F3', '#00B0FF', '#00BCD4', '#00ACC1', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC400', '#FF9100', '#FF6E40', '#FF5252', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#1976D2', '#1565C0'];
         
         let zonesById = {}, feedersById = {}, feedersByZone = {}, transformersDir1 = [], transformersDir2 = [], allTransformers = [], feederColors = {}, colorIndex = 0;
+        let currentSearchResults = [];
         const map = L.map('map').setView([36.2, 44.0], 11);
         let baseLayerOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
         let baseLayerSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom: 18, attribution: 'Tiles &copy; Esri'});
@@ -193,6 +200,21 @@
         let layerCache = {zones: new Map(), feeders: new Map()}, circleMarker = null, searchLocationMarker = null;
         let searchResultsLayer = null;
 
+        // NUMERIC SORT FUNCTION
+        function sortZoneNames(zones) {
+            return zones.sort((a, b) => {
+                const aNum = parseInt(a.match(/\d+/)?.[0] || 0);
+                const bNum = parseInt(b.match(/\d+/)?.[0] || 0);
+                const aPrefix = a.replace(/\d+/g, '').trim();
+                const bPrefix = b.replace(/\d+/g, '').trim();
+                
+                if (aPrefix === 'Pilot' && bPrefix !== 'Pilot') return -1;
+                if (aPrefix !== 'Pilot' && bPrefix === 'Pilot') return 1;
+                if (aPrefix !== bPrefix) return aPrefix.localeCompare(bPrefix);
+                return aNum - bNum;
+            });
+        }
+
         fetch('data/erbil_zones.geojson').then(r => r.json()).then(data => {
             data.features.forEach((f, idx) => {
                 zonesById[f.properties.Zone_name] = {feature: f, color: zoneColors[idx % zoneColors.length]};
@@ -200,84 +222,109 @@
             buildLayerControl();
         }).catch(err => console.log('Zones error:', err));
 
-// REPLACE THIS SECTION in your HTML:
-
-fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
-    try {
-        data.features.forEach(f => {
-            if (f.geometry && f.geometry.coordinates && f.properties) {
-                // Auto-detect ID property - try multiple names
-                let id = f.properties['Transformer ID'] 
-                    || f.properties['transformer_id'] 
-                    || f.properties['TRANSFORMER_ID']
-                    || f.properties['TransformerID']
-                    || f.properties['ID']
-                    || f.properties['id']
-                    || Object.keys(f.properties)[0]; // Use first property as fallback
-                    
-                id = String(id || 'Unknown');
-                const coords = f.geometry.coordinates;
-                transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
-                allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
+        fetch('data/erbil_feeders.geojson').then(r => r.json()).then(data => {
+            const feedersMap = {};
+            data.features.forEach(f => {
+                const feederName = f.properties.FeederName;
+                const zone = f.properties.Zone;
+                if (!feedersMap[feederName]) feedersMap[feederName] = {zone: zone, features: []};
+                feedersMap[feederName].features.push(f);
+            });
+            for (const feederName in feedersMap) {
+                const zone = feedersMap[feederName].zone;
+                if (!feederColors[feederName]) {
+                    feederColors[feederName] = colorPalette[colorIndex % colorPalette.length];
+                    colorIndex++;
+                }
+                feedersById[feederName] = {zone: zone, features: feedersMap[feederName].features, color: feederColors[feederName]};
+                if (!feedersByZone[zone]) feedersByZone[zone] = [];
+                feedersByZone[zone].push(feederName);
             }
-        });
-        console.log('✅ Dir 1 Loaded:', transformersDir1.length, 'transformers');
-    } catch (e) {
-        console.error('❌ Dir 1 Error:', e.message);
-    }
-}).catch(err => console.log('Dir 1 file error:', err));
+            buildLayerControl();
+        }).catch(err => console.log('Feeders error:', err));
 
-fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
-    try {
-        data.features.forEach(f => {
-            if (f.geometry && f.geometry.coordinates && f.properties) {
-                // Auto-detect ID property
-                let id = f.properties['Transformer ID'] 
-                    || f.properties['transformer_id'] 
-                    || f.properties['TRANSFORMER_ID']
-                    || f.properties['TransformerID']
-                    || f.properties['ID']
-                    || f.properties['id']
-                    || Object.keys(f.properties)[0];
-                    
-                id = String(id || 'Unknown');
-                const coords = f.geometry.coordinates;
-                transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
-                allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
+        fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
+            try {
+                data.features.forEach(f => {
+                    if (f.geometry && f.geometry.coordinates && f.properties) {
+                        let id = f.properties['Transformer ID'] || f.properties['transformer_id'] || f.properties['TRANSFORMER_ID'] || f.properties['TransformerID'] || f.properties['ID'] || f.properties['id'] || Object.keys(f.properties)[0];
+                        id = String(id || 'Unknown');
+                        const coords = f.geometry.coordinates;
+                        transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
+                        allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
+                    }
+                });
+                console.log('✅ CO1 Loaded:', transformersDir1.length, 'transformers');
+            } catch (e) {
+                console.error('❌ CO1 Error:', e.message);
             }
-        });
-        console.log('✅ Dir 2 Loaded:', transformersDir2.length, 'transformers');
-    } catch (e) {
-        console.error('❌ Dir 2 Error:', e.message);
-    }
-}).catch(err => console.log('Dir 2 file error:', err));
+        }).catch(err => console.log('CO1 error:', err));
 
+        fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
+            try {
+                data.features.forEach(f => {
+                    if (f.geometry && f.geometry.coordinates && f.properties) {
+                        let id = f.properties['Transformer ID'] || f.properties['transformer_id'] || f.properties['TRANSFORMER_ID'] || f.properties['TransformerID'] || f.properties['ID'] || f.properties['id'] || Object.keys(f.properties)[0];
+                        id = String(id || 'Unknown');
+                        const coords = f.geometry.coordinates;
+                        transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
+                        allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
+                    }
+                });
+                console.log('✅ CO2 Loaded:', transformersDir2.length, 'transformers');
+            } catch (e) {
+                console.error('❌ CO2 Error:', e.message);
+            }
+        }).catch(err => console.log('CO2 error:', err));
 
         function buildLayerControl() {
             const control = document.getElementById('layerControl');
             control.innerHTML = '';
+            
             const zonesGroup = document.createElement('div');
             zonesGroup.className = 'layer-group';
             zonesGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Erbil Zones (' + Object.keys(zonesById).length + ')</div><div class="layer-items" id="zones-list"></div>';
             control.appendChild(zonesGroup);
+            
             const zonesList = document.getElementById('zones-list');
-            for (const zoneId in zonesById) {
+            const sortedZones = sortZoneNames(Object.keys(zonesById));
+            sortedZones.forEach(zoneId => {
                 const zoneObj = zonesById[zoneId];
                 const item = document.createElement('div');
                 item.className = 'layer-item';
                 item.innerHTML = '<input type="checkbox" id="zone-' + zoneId + '" onchange="toggleZone(\'' + zoneId + '\', this.checked)"><div class="layer-color-swatch" style="background-color: ' + zoneObj.color + ';"></div><label for="zone-' + zoneId + '">' + zoneId + '</label>';
                 zonesList.appendChild(item);
-            }
+            });
+            
             const feedersGroup = document.createElement('div');
             feedersGroup.className = 'layer-group';
             feedersGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Erbil Feeders (' + Object.keys(feedersById).length + ')</div><div class="layer-items" id="feeders-list"></div>';
             control.appendChild(feedersGroup);
+            
             const feedersList = document.getElementById('feeders-list');
-            const sortedZones = Object.keys(feedersByZone).sort();
-            sortedZones.forEach(zone => {
+            const sortedFeeders = sortZoneNames(Object.keys(feedersByZone));
+            sortedFeeders.forEach(zone => {
                 const zoneGroup = document.createElement('div');
                 zoneGroup.className = 'sub-layer-group';
-                zoneGroup.innerHTML = '<div class="sub-layer-group-title">' + zone + ' (' + feedersByZone[zone].length + ')</div>';
+                const selectAllBtn = document.createElement('span');
+                selectAllBtn.className = 'sub-zone-select-all';
+                selectAllBtn.textContent = 'Select All';
+                selectAllBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    const checkboxes = zoneGroup.querySelectorAll('input[type="checkbox"]');
+                    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+                    checkboxes.forEach(cb => {
+                        cb.checked = !allChecked;
+                        cb.onchange();
+                    });
+                };
+                
+                const titleDiv = document.createElement('div');
+                titleDiv.className = 'sub-layer-group-title';
+                titleDiv.appendChild(document.createTextNode(zone + ' (' + feedersByZone[zone].length + ')'));
+                titleDiv.appendChild(selectAllBtn);
+                zoneGroup.appendChild(titleDiv);
+                
                 const feedersInZone = document.createElement('div');
                 feedersInZone.style.display = 'flex';
                 feedersInZone.style.flexDirection = 'column';
@@ -299,6 +346,41 @@ fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).th
         function renderZone(zoneId) { if (layerCache.zones.has(zoneId)) return; const zoneObj = zonesById[zoneId]; const layer = L.geoJSON(zoneObj.feature, {style: {color: zoneObj.color, weight: 2, opacity: 1, fillOpacity: 0.5}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Zone')); }}).addTo(map); layerCache.zones.set(zoneId, layer); }
         function toggleFeeder(feederName, visible) { if (visible) { activeFeeders.add(feederName); renderFeeder(feederName); } else { activeFeeders.delete(feederName); if (layerCache.feeders.get(feederName)) { map.removeLayer(layerCache.feeders.get(feederName)); layerCache.feeders.delete(feederName); } } }
         function renderFeeder(feederName) { if (layerCache.feeders.has(feederName)) return; const feederObj = feedersById[feederName]; const featureCollection = {type: 'FeatureCollection', features: feederObj.features}; const layer = L.geoJSON(featureCollection, {style: {color: feederObj.color, weight: 2.5, opacity: 0.8}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Feeder')); }}).addTo(map); layerCache.feeders.set(feederName, layer); }
+
+        function pointInPolygon(point, polygon) {
+            const [x, y] = point;
+            let inside = false;
+            for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+                const [xi, yi] = polygon[i];
+                const [xj, yj] = polygon[j];
+                const intersect = ((yi > y) !== (yj > y)) && (x < ((xj - xi) * (y - yi)) / (yj - yi) + xi);
+                if (intersect) inside = !inside;
+            }
+            return inside;
+        }
+
+        function getTransformerZone(transformer) {
+            const coords = [transformer.latlng[0], transformer.latlng[1]];
+            for (const zoneName in zonesById) {
+                const zoneFeature = zonesById[zoneName].feature;
+                if (zoneFeature.geometry.type === 'Polygon') {
+                    if (pointInPolygon(coords, zoneFeature.geometry.coordinates[0])) {
+                        return zoneName;
+                    }
+                } else if (zoneFeature.geometry.type === 'MultiPolygon') {
+                    for (const polygon of zoneFeature.geometry.coordinates) {
+                        if (pointInPolygon(coords, polygon[0])) {
+                            return zoneName;
+                        }
+                    }
+                }
+            }
+            return 'Unknown';
+        }
+
+        function getTransformerFeeder(transformer) {
+            return transformer.feature.properties['Feeder'] || 'Unknown';
+        }
 
         function clearSearchResults() {
             if (searchResultsLayer) {
@@ -393,23 +475,20 @@ fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).th
             });
             
             const resultsInRadius = allTransformers
-                .map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])}))
+                .map(t => ({
+                    ...t, 
+                    distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0]),
+                    feeder: getTransformerFeeder(t),
+                    zone: getTransformerZone(t)
+                }))
                 .filter(t => t.distance <= radiusKm)
                 .sort((a, b) => a.distance - b.distance);
             
+            currentSearchResults = resultsInRadius;
             displayCoordinateResultsTable(resultsInRadius);
             showSearchResultsOnMap(resultsInRadius);
-            displaySearchInfo(resultsInRadius, radiusMeters);
             map.setView([lat, lng], 14);
-        }
-
-        function displaySearchInfo(results, radius) {
-            const infoDiv = document.getElementById('searchResultsInfo');
-            if (results.length === 0) {
-                infoDiv.innerHTML = '<div class="search-results-info">No transformers found within <strong>' + radius + ' meters</strong></div>';
-            } else {
-                infoDiv.innerHTML = '<div class="search-results-info">Found <strong>' + results.length + '</strong> transformer(s) within <strong>' + radius + ' meters</strong>. Showing on map.</div>';
-            }
+            openResultsSidebar();
         }
 
         function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -425,26 +504,51 @@ fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).th
             const tableBody = document.getElementById('resultsTableBody');
             tableBody.innerHTML = '';
             if (results.length === 0) {
-                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">No transformers found within radius</td></tr>';
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #999;">No transformers found</td></tr>';
             } else {
                 results.forEach((result, rank) => {
                     const row = document.createElement('tr');
                     const distanceMeters = (result.distance * 1000).toFixed(0);
-                    row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td><span class="distance-badge">' + distanceMeters + ' m</span></td>';
+                    row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td>' + result.feeder + '</td><td>' + result.zone + '</td><td><span class="distance-badge">' + distanceMeters + 'm</span></td>';
                     row.style.cursor = 'pointer';
                     row.onclick = () => {
                         map.setView([result.latlng[1], result.latlng[0]], 16);
                         showFeatureInfo(result.feature, 'Transformer');
-                        closeResultsModal();
                     };
                     tableBody.appendChild(row);
                 });
             }
-            document.getElementById('resultsModal').classList.add('active');
         }
 
-        function closeResultsModal() {
-            document.getElementById('resultsModal').classList.remove('active');
+        function openResultsSidebar() {
+            document.getElementById('resultsSidebar').classList.add('active');
+            document.documentElement.style.setProperty('--results-sidebar-width', '450px');
+        }
+
+        function closeResultsSidebar() {
+            document.getElementById('resultsSidebar').classList.remove('active');
+            document.documentElement.style.setProperty('--results-sidebar-width', '0px');
+        }
+
+        function exportToCSV() {
+            if (currentSearchResults.length === 0) {
+                alert('No results to export');
+                return;
+            }
+            
+            let csv = 'Rank,Transformer ID,Feeder,Geographical Zone,Distance (m)\n';
+            currentSearchResults.forEach((result, index) => {
+                const distanceMeters = (result.distance * 1000).toFixed(0);
+                csv += `${index + 1},"${result.id}","${result.feeder}","${result.zone}",${distanceMeters}\n`;
+            });
+            
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'transformer_search_results.csv';
+            a.click();
+            window.URL.revokeObjectURL(url);
         }
 
         function showFeatureInfo(feature, type) {
