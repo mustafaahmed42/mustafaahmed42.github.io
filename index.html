@@ -136,9 +136,11 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
+        // Color palettes
         const zoneColors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F', '#BB8FCE', '#85C1E2', '#F8B88B', '#52B788', '#D5573B', '#E8949A', '#A8DADC', '#457B9D', '#F1FAEE', '#E63946', '#A8E6CF', '#FFD3B6', '#FFAAA5', '#FF8B94', '#A4DE6C', '#D4F1F4', '#E2F0F7', '#F4E4C1', '#E4D9FF', '#FFD6E8', '#C1E7FF', '#E0FFD1', '#FFE0F0', '#D4FFE3', '#FFF4E6', '#E6F3FF', '#FFE6F0', '#E6FFF9', '#FFF0E6', '#F0E6FF', '#FFE6E6', '#E6F0FF', '#F0FFF5', '#FFF5E6', '#FFE6F5', '#E6F5FF', '#F5F5FF', '#FFF5F0', '#F5FFF0', '#FFF0F5'];
         const colorPalette = ['#FF1744', '#F50057', '#D500F9', '#651FFF', '#2979F3', '#00B0FF', '#00BCD4', '#00ACC1', '#009688', '#4CAF50', '#8BC34A', '#CDDC39', '#FFEB3B', '#FFC400', '#FF9100', '#FF6E40', '#FF5252', '#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#1976D2', '#1565C0'];
         
+        // Data storage
         let zonesById = {};
         let feedersById = {};
         let feedersByZone = {};
@@ -148,17 +150,24 @@
         let feederColors = {};
         let colorIndex = 0;
 
+        // Map initialization
         const map = L.map('map').setView([36.2, 44.0], 11);
         let baseLayerOSM = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom: 19, attribution: '© OpenStreetMap'}).addTo(map);
         let baseLayerSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {maxZoom: 18, attribution: 'Tiles &copy; Esri'});
 
+        // Sidebar resize handler
         const sidebar = document.getElementById('sidebar');
         const resizeHandle = document.getElementById('resizeHandle');
         let isResizing = false;
-        resizeHandle.addEventListener('mousedown', () => {isResizing = true;});
-        document.addEventListener('mousemove', (e) => {if (!isResizing) return; const newWidth = Math.max(250, Math.min(600, e.clientX)); document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');});
-        document.addEventListener('mouseup', () => {isResizing = false;});
+        resizeHandle.addEventListener('mousedown', () => { isResizing = true; });
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const newWidth = Math.max(250, Math.min(600, e.clientX));
+            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+        });
+        document.addEventListener('mouseup', () => { isResizing = false; });
 
+        // Map type switcher
         function switchMap(type) {
             document.querySelectorAll('.map-btn').forEach(btn => btn.classList.remove('active'));
             event.target.classList.add('active');
@@ -171,72 +180,93 @@
             }
         }
 
+        // Layer state management
         let activeZones = new Set();
         let activeFeeders = new Set();
+        let transformersDir1Visible = true;
+        let transformersDir2Visible = true;
         let layerCache = {zones: new Map(), feeders: new Map()};
         let circleMarker = null;
         let transformersDir1Layer = null;
         let transformersDir2Layer = null;
 
-        fetch('data/erbil_zones.geojson').then(r => r.json()).then(data => {
-            console.log('Zones:', data.features.length);
-            data.features.forEach((f, idx) => {
-                zonesById[f.properties.Zone_name] = {feature: f, color: zoneColors[idx % zoneColors.length]};
-            });
-            buildLayerControl();
-        }).catch(err => console.log('Zones error:', err));
+        // Load zones
+        fetch('data/erbil_zones.geojson')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Zones:', data.features.length);
+                data.features.forEach((f, idx) => {
+                    zonesById[f.properties.Zone_name] = {feature: f, color: zoneColors[idx % zoneColors.length]};
+                });
+                buildLayerControl();
+            })
+            .catch(err => console.log('Zones error:', err));
 
-        fetch('data/erbil_feeders.geojson').then(r => r.json()).then(data => {
-            console.log('Feeders:', data.features.length);
-            const feedersMap = {};
-            data.features.forEach(f => {
-                const feederName = f.properties.FeederName;
-                const zone = f.properties.Zone;
-                if (!feedersMap[feederName]) feedersMap[feederName] = {zone: zone, features: []};
-                feedersMap[feederName].features.push(f);
-            });
-            for (const feederName in feedersMap) {
-                const zone = feedersMap[feederName].zone;
-                if (!feederColors[feederName]) {
-                    feederColors[feederName] = colorPalette[colorIndex % colorPalette.length];
-                    colorIndex++;
+        // Load feeders
+        fetch('data/erbil_feeders.geojson')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Feeders:', data.features.length);
+                const feedersMap = {};
+                data.features.forEach(f => {
+                    const feederName = f.properties.FeederName;
+                    const zone = f.properties.Zone;
+                    if (!feedersMap[feederName]) feedersMap[feederName] = {zone: zone, features: []};
+                    feedersMap[feederName].features.push(f);
+                });
+                for (const feederName in feedersMap) {
+                    const zone = feedersMap[feederName].zone;
+                    if (!feederColors[feederName]) {
+                        feederColors[feederName] = colorPalette[colorIndex % colorPalette.length];
+                        colorIndex++;
+                    }
+                    feedersById[feederName] = {zone: zone, features: feedersMap[feederName].features, color: feederColors[feederName]};
+                    if (!feedersByZone[zone]) feedersByZone[zone] = [];
+                    feedersByZone[zone].push(feederName);
                 }
-                feedersById[feederName] = {zone: zone, features: feedersMap[feederName].features, color: feederColors[feederName]};
-                if (!feedersByZone[zone]) feedersByZone[zone] = [];
-                feedersByZone[zone].push(feederName);
-            }
-            console.log('Feeders distinct:', Object.keys(feedersById).length);
-            buildLayerControl();
-        }).catch(err => console.log('Feeders error:', err));
+                console.log('Feeders distinct:', Object.keys(feedersById).length);
+                buildLayerControl();
+            })
+            .catch(err => console.log('Feeders error:', err));
 
-        fetch('data/1092025_directory 1_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            console.log('Dir 1:', data.features.length);
-            data.features.forEach(f => {
-                const id = f.properties['Transformer ID'];
-                const coords = f.geometry.coordinates;
-                transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
-                allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
-            });
-            renderTransformersDir1();
-            buildLayerControl();
-        }).catch(err => console.log('Dir 1 error:', err));
+        // Load transformers directory 1
+        fetch('data/1092025_directory 1_transformer_NEW.geojson')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Dir 1:', data.features.length);
+                data.features.forEach(f => {
+                    const id = f.properties['Transformer ID'];
+                    const coords = f.geometry.coordinates;
+                    transformersDir1.push({id: id, feature: f, latlng: coords, dir: 1});
+                    allTransformers.push({id: id, feature: f, latlng: coords, dir: 1});
+                });
+                renderTransformersDir1();
+                buildLayerControl();
+            })
+            .catch(err => console.log('Dir 1 error:', err));
 
-        fetch('data/1092025_directory 2_transformer_NEW.geojson').then(r => r.json()).then(data => {
-            console.log('Dir 2:', data.features.length);
-            data.features.forEach(f => {
-                const id = f.properties['Transformer ID'];
-                const coords = f.geometry.coordinates;
-                transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
-                allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
-            });
-            renderTransformersDir2();
-            buildLayerControl();
-        }).catch(err => console.log('Dir 2 error:', err));
+        // Load transformers directory 2
+        fetch('data/1092025_directory 2_transformer_NEW.geojson')
+            .then(r => r.json())
+            .then(data => {
+                console.log('Dir 2:', data.features.length);
+                data.features.forEach(f => {
+                    const id = f.properties['Transformer ID'];
+                    const coords = f.geometry.coordinates;
+                    transformersDir2.push({id: id, feature: f, latlng: coords, dir: 2});
+                    allTransformers.push({id: id, feature: f, latlng: coords, dir: 2});
+                });
+                renderTransformersDir2();
+                buildLayerControl();
+            })
+            .catch(err => console.log('Dir 2 error:', err));
 
+        // Build layer control UI
         function buildLayerControl() {
             const control = document.getElementById('layerControl');
             control.innerHTML = '';
 
+            // Zones section
             const zonesGroup = document.createElement('div');
             zonesGroup.className = 'layer-group';
             zonesGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Erbil Zones (' + Object.keys(zonesById).length + ')</div><div class="layer-items" id="zones-list"></div>';
@@ -251,6 +281,7 @@
                 zonesList.appendChild(item);
             }
 
+            // Feeders section
             const feedersGroup = document.createElement('div');
             feedersGroup.className = 'layer-group';
             feedersGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Erbil Feeders (' + Object.keys(feedersById).length + ')</div><div class="layer-items" id="feeders-list"></div>';
@@ -277,6 +308,7 @@
                 feedersList.appendChild(zoneGroup);
             });
 
+            // Transformers section
             const transformersGroup = document.createElement('div');
             transformersGroup.className = 'layer-group';
             transformersGroup.innerHTML = '<div class="layer-group-title" onclick="toggleGroup(this)"><span class="toggle-arrow">▶</span>Transformers (' + (transformersDir1.length + transformersDir2.length) + ')</div><div class="layer-items" id="transformers-list"></div>';
@@ -285,35 +317,194 @@
             const transformersList = document.getElementById('transformers-list');
             const t1Item = document.createElement('div');
             t1Item.className = 'layer-item';
-            t1Item.innerHTML = '<input type="checkbox" id="t1-checkbox" checked onchange="toggleTransformersDir1(this.checked)">
-<div class="layer-color-swatch" style="background-color: #ff7800;"></div><label for="t1-checkbox">Directory 1 (' + transformersDir1.length + ')</label>';
+            t1Item.innerHTML = '<input type="checkbox" id="t1-checkbox" checked onchange="toggleTransformersDir1(this.checked)"><div class="layer-color-swatch" style="background-color: #ff7800;"></div><label for="t1-checkbox">Directory 1 (' + transformersDir1.length + ')</label>';
             transformersList.appendChild(t1Item);
 
             const t2Item = document.createElement('div');
             t2Item.className = 'layer-item';
-            t2Item.innerHTML = '<input type="checkbox" id="t2-checkbox" checked disabled><div class="layer-color-swatch" style="background-color: #00a8ff;"></div><label for="t2-checkbox">Directory 2 (' + transformersDir2.length + ')</label>';
+            t2Item.innerHTML = '<input type="checkbox" id="t2-checkbox" checked onchange="toggleTransformersDir2(this.checked)"><div class="layer-color-swatch" style="background-color: #00a8ff;"></div><label for="t2-checkbox">Directory 2 (' + transformersDir2.length + ')</label>';
             transformersList.appendChild(t2Item);
         }
 
-        function toggleGroup(element) { element.parentElement.classList.toggle('collapsed'); }
-        function toggleZone(zoneId, visible) { if (visible) { activeZones.add(zoneId); renderZone(zoneId); } else { activeZones.delete(zoneId); if (layerCache.zones.get(zoneId)) { map.removeLayer(layerCache.zones.get(zoneId)); layerCache.zones.delete(zoneId); } } }
-        function renderZone(zoneId) { if (layerCache.zones.has(zoneId)) return; const zoneObj = zonesById[zoneId]; const layer = L.geoJSON(zoneObj.feature, {style: {color: zoneObj.color, weight: 2, opacity: 1, fillOpacity: 0.5}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Zone')); }}).addTo(map); layerCache.zones.set(zoneId, layer); }
-        function toggleFeeder(feederName, visible) { if (visible) { activeFeeders.add(feederName); renderFeeder(feederName); } else { activeFeeders.delete(feederName); if (layerCache.feeders.get(feederName)) { map.removeLayer(layerCache.feeders.get(feederName)); layerCache.feeders.delete(feederName); } } }
-        function renderFeeder(feederName) { if (layerCache.feeders.has(feederName)) return; const feederObj = feedersById[feederName]; const featureCollection = {type: 'FeatureCollection', features: feederObj.features}; const layer = L.geoJSON(featureCollection, {style: {color: feederObj.color, weight: 2.5, opacity: 0.8}, onEachFeature: (feature, layer) => { layer.on('click', () => showFeatureInfo(feature, 'Feeder')); }}).addTo(map); layerCache.feeders.set(feederName, layer); }
+        // Toggle layer group collapse
+        function toggleGroup(element) {
+            element.parentElement.classList.toggle('collapsed');
+        }
 
-        function renderTransformersDir1() { if (transformersDir1Layer) map.removeLayer(transformersDir1Layer); if (transformersDir1.length === 0) return; const fc = {type: 'FeatureCollection', features: transformersDir1.map(t => t.feature)}; transformersDir1Layer = L.geoJSON(fc, {pointToLayer: (feature, latlng) => { const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#ff7800', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8}); const id = feature.properties['Transformer ID']; marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'}); marker.on('click', () => showFeatureInfo(feature, 'Transformer')); return marker; }}).addTo(map); }
+        // Zone toggle
+        function toggleZone(zoneId, visible) {
+            if (visible) {
+                activeZones.add(zoneId);
+                renderZone(zoneId);
+            } else {
+                activeZones.delete(zoneId);
+                if (layerCache.zones.get(zoneId)) {
+                    map.removeLayer(layerCache.zones.get(zoneId));
+                    layerCache.zones.delete(zoneId);
+                }
+            }
+        }
 
-        function renderTransformersDir2() { if (transformersDir2Layer) map.removeLayer(transformersDir2Layer); if (transformersDir2.length === 0) return; const fc = {type: 'FeatureCollection', features: transformersDir2.map(t => t.feature)}; transformersDir2Layer = L.geoJSON(fc, {pointToLayer: (feature, latlng) => { const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#00a8ff', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8}); const id = feature.properties['Transformer ID']; marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'}); marker.on('click', () => showFeatureInfo(feature, 'Transformer')); return marker; }}).addTo(map); }
+        function renderZone(zoneId) {
+            if (layerCache.zones.has(zoneId)) return;
+            const zoneObj = zonesById[zoneId];
+            const layer = L.geoJSON(zoneObj.feature, {
+                style: {color: zoneObj.color, weight: 2, opacity: 1, fillOpacity: 0.5},
+                onEachFeature: (feature, layer) => {
+                    layer.on('click', () => showFeatureInfo(feature, 'Zone'));
+                }
+            }).addTo(map);
+            layerCache.zones.set(zoneId, layer);
+        }
 
-        function searchByCoordinate() { const lat = parseFloat(document.getElementById('coordLat').value); const lng = parseFloat(document.getElementById('coordLng').value); const radiusMeters = parseFloat(document.getElementById('searchRadius').value); if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) { alert('Please enter valid latitude, longitude, and radius'); return; } const radiusKm = radiusMeters / 1000; if (circleMarker) map.removeLayer(circleMarker); circleMarker = L.circle([lat, lng], {radius: radiusMeters, color: '#667eea', fill: true, fillColor: '#667eea', fillOpacity: 0.1, weight: 2}).addTo(map); const resultsInRadius = allTransformers.map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])})).filter(t => t.distance <= radiusKm).sort((a, b) => a.distance - b.distance); displayCoordinateResultsTable(resultsInRadius); map.setView([lat, lng], 14); }
+        // Feeder toggle
+        function toggleFeeder(feederName, visible) {
+            if (visible) {
+                activeFeeders.add(feederName);
+                renderFeeder(feederName);
+            } else {
+                activeFeeders.delete(feederName);
+                if (layerCache.feeders.get(feederName)) {
+                    map.removeLayer(layerCache.feeders.get(feederName));
+                    layerCache.feeders.delete(feederName);
+                }
+            }
+        }
 
-        function calculateDistance(lat1, lon1, lat2, lon2) { const R = 6371; const dLat = (lat2 - lat1) * Math.PI / 180; const dLon = (lon2 - lon1) * Math.PI / 180; const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2); const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); return R * c; }
+        function renderFeeder(feederName) {
+            if (layerCache.feeders.has(feederName)) return;
+            const feederObj = feedersById[feederName];
+            const featureCollection = {type: 'FeatureCollection', features: feederObj.features};
+            const layer = L.geoJSON(featureCollection, {
+                style: {color: feederObj.color, weight: 2.5, opacity: 0.8},
+                onEachFeature: (feature, layer) => {
+                    layer.on('click', () => showFeatureInfo(feature, 'Feeder'));
+                }
+            }).addTo(map);
+            layerCache.feeders.set(feederName, layer);
+        }
 
-        function displayCoordinateResultsTable(results) { const tableBody = document.getElementById('resultsTableBody'); tableBody.innerHTML = ''; if (results.length === 0) { tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">No transformers found within radius</td></tr>'; } else { results.forEach((result, rank) => { const row = document.createElement('tr'); const distanceMeters = (result.distance * 1000).toFixed(0); row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td><span class="distance-badge">' + distanceMeters + ' m</span></td>'; row.style.cursor = 'pointer'; row.onclick = () => { map.setView([result.latlng[1], result.latlng[0]], 16); showFeatureInfo(result.feature, 'Transformer'); closeResultsModal(); }; tableBody.appendChild(row); }); } document.getElementById('resultsModal').classList.add('active'); }
+        // Transformer rendering
+        function renderTransformersDir1() {
+            if (transformersDir1Layer) map.removeLayer(transformersDir1Layer);
+            if (transformersDir1.length === 0 || !transformersDir1Visible) return;
+            const fc = {type: 'FeatureCollection', features: transformersDir1.map(t => t.feature)};
+            transformersDir1Layer = L.geoJSON(fc, {
+                pointToLayer: (feature, latlng) => {
+                    const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#ff7800', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8});
+                    const id = feature.properties['Transformer ID'];
+                    marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'});
+                    marker.on('click', () => showFeatureInfo(feature, 'Transformer'));
+                    return marker;
+                }
+            }).addTo(map);
+        }
 
-        function closeResultsModal() { document.getElementById('resultsModal').classList.remove('active'); }
-        function showFeatureInfo(feature, type) { const infoPanel = document.getElementById('infoPanel'); const content = document.getElementById('infoPanelContent'); let html = '<h4>' + type + ' Info</h4>'; for (let key in feature.properties) { if (feature.properties[key] && feature.properties[key] !== null && feature.properties[key] !== 'NULL') { html += '<p><strong>' + key + ':</strong> ' + feature.properties[key] + '</p>'; } } content.innerHTML = html; infoPanel.classList.add('active'); }
-        function closeInfoPanel() { document.getElementById('infoPanel').classList.remove('active'); }
+        function renderTransformersDir2() {
+            if (transformersDir2Layer) map.removeLayer(transformersDir2Layer);
+            if (transformersDir2.length === 0 || !transformersDir2Visible) return;
+            const fc = {type: 'FeatureCollection', features: transformersDir2.map(t => t.feature)};
+            transformersDir2Layer = L.geoJSON(fc, {
+                pointToLayer: (feature, latlng) => {
+                    const marker = L.circleMarker(latlng, {radius: 8, fillColor: '#00a8ff', color: '#fff', weight: 2, opacity: 1, fillOpacity: 0.8});
+                    const id = feature.properties['Transformer ID'];
+                    marker.bindTooltip(id, {permanent: true, direction: 'top', offset: [0, -12], className: 'transformer-label'});
+                    marker.on('click', () => showFeatureInfo(feature, 'Transformer'));
+                    return marker;
+                }
+            }).addTo(map);
+        }
+
+        // Transformer toggle functions
+        function toggleTransformersDir1(visible) {
+            transformersDir1Visible = visible;
+            renderTransformersDir1();
+        }
+
+        function toggleTransformersDir2(visible) {
+            transformersDir2Visible = visible;
+            renderTransformersDir2();
+        }
+
+        // Search functions
+        function searchByCoordinate() {
+            const lat = parseFloat(document.getElementById('coordLat').value);
+            const lng = parseFloat(document.getElementById('coordLng').value);
+            const radiusMeters = parseFloat(document.getElementById('searchRadius').value);
+            if (isNaN(lat) || isNaN(lng) || isNaN(radiusMeters)) {
+                alert('Please enter valid latitude, longitude, and radius');
+                return;
+            }
+            const radiusKm = radiusMeters / 1000;
+            if (circleMarker) map.removeLayer(circleMarker);
+            circleMarker = L.circle([lat, lng], {
+                radius: radiusMeters,
+                color: '#667eea',
+                fill: true,
+                fillColor: '#667eea',
+                fillOpacity: 0.1,
+                weight: 2
+            }).addTo(map);
+            const resultsInRadius = allTransformers
+                .map(t => ({...t, distance: calculateDistance(lat, lng, t.latlng[1], t.latlng[0])}))
+                .filter(t => t.distance <= radiusKm)
+                .sort((a, b) => a.distance - b.distance);
+            displayCoordinateResultsTable(resultsInRadius);
+            map.setView([lat, lng], 14);
+        }
+
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c;
+        }
+
+        function displayCoordinateResultsTable(results) {
+            const tableBody = document.getElementById('resultsTableBody');
+            tableBody.innerHTML = '';
+            if (results.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 20px; color: #999;">No transformers found within radius</td></tr>';
+            } else {
+                results.forEach((result, rank) => {
+                    const row = document.createElement('tr');
+                    const distanceMeters = (result.distance * 1000).toFixed(0);
+                    row.innerHTML = '<td><strong>' + (rank + 1) + '</strong></td><td><strong>' + result.id + '</strong></td><td><span class="distance-badge">' + distanceMeters + ' m</span></td>';
+                    row.style.cursor = 'pointer';
+                    row.onclick = () => {
+                        map.setView([result.latlng[1], result.latlng[0]], 16);
+                        showFeatureInfo(result.feature, 'Transformer');
+                        closeResultsModal();
+                    };
+                    tableBody.appendChild(row);
+                });
+            }
+            document.getElementById('resultsModal').classList.add('active');
+        }
+
+        function closeResultsModal() {
+            document.getElementById('resultsModal').classList.remove('active');
+        }
+
+        // Info panel
+        function showFeatureInfo(feature, type) {
+            const infoPanel = document.getElementById('infoPanel');
+            const content = document.getElementById('infoPanelContent');
+            let html = '<h4>' + type + ' Info</h4>';
+            for (let key in feature.properties) {
+                if (feature.properties[key] && feature.properties[key] !== null && feature.properties[key] !== 'NULL') {
+                    html += '<p><strong>' + key + ':</strong> ' + feature.properties[key] + '</p>';
+                }
+            }
+            content.innerHTML = html;
+            infoPanel.classList.add('active');
+        }
+
+        function closeInfoPanel() {
+            document.getElementById('infoPanel').classList.remove('active');
+        }
     </script>
 </body>
 </html>
